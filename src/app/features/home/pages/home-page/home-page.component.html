@@ -1,0 +1,26 @@
+<main class="home-page">
+  <section class="home-panel">
+    <header>
+      <div>
+        <p>Signed in</p>
+        <h1>{{ user()?.displayName || user()?.username }}</h1>
+      </div>
+      <button type="button" (click)="logout()">Logout</button>
+    </header>
+
+    @if (status(); as apiStatus) {
+      <div class="status-grid" aria-label="System status">
+        <div>
+          <span>Backend</span>
+          <strong>{{ apiStatus.backend }}</strong>
+        </div>
+        <div>
+          <span>Database</span>
+          <strong>{{ apiStatus.database }}</strong>
+        </div>
+      </div>
+    } @else {
+      <p class="message">{{ statusError() || 'Checking backend and database...' }}</p>
+    }
+  </section>
+</main>
