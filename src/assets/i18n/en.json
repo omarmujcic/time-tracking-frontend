@@ -1,0 +1,114 @@
+{
+  "app": {
+    "brand": "Time Tracking",
+    "brandMark": "T",
+    "logout": "Logout",
+    "nav": {
+      "primary": "Primary navigation",
+      "dashboard": "Dashboard",
+      "reports": "Reports",
+      "import": "Import",
+      "invoice": "Invoice",
+      "calendar": "Calendar",
+      "settings": "Settings",
+      "manage": "Manage"
+    }
+  },
+  "features": {
+    "auth": {
+      "title": {
+        "login": "Sign in",
+        "register": "Create user"
+      },
+      "mode": {
+        "label": "Authentication mode",
+        "login": "Login",
+        "register": "New user"
+      },
+      "form": {
+        "username": "Username",
+        "displayName": "Display name",
+        "password": "Password",
+        "pleaseWait": "Please wait..."
+      },
+      "error": {
+        "login": "Invalid username or password.",
+        "register": "Unable to create user."
+      }
+    },
+    "dashboard": {
+      "title": "Time tracking",
+      "summary": {
+        "totalTime": "Total time",
+        "totalAmount": "Total amount",
+        "entries": "Entries"
+      },
+      "timer": {
+        "title": "Start timer",
+        "start": "Start"
+      },
+      "manual": {
+        "title": "Manual entry",
+        "add": "Add entry"
+      },
+      "filters": {
+        "title": "Filters",
+        "month": "Month",
+        "day": "Day",
+        "user": "User",
+        "apply": "Apply",
+        "reset": "Reset"
+      },
+      "entries": {
+        "title": "Time entries",
+        "empty": "No time entries match these filters."
+      },
+      "entry": {
+        "project": "Project",
+        "description": "Description",
+        "noDescription": "No description",
+        "hourlyRateEur": "Hourly rate EUR",
+        "rateEur": "Rate EUR",
+        "start": "Start",
+        "end": "End",
+        "started": "Started",
+        "stopped": "Stopped",
+        "running": "Running",
+        "save": "Save",
+        "cancel": "Cancel",
+        "stop": "Stop",
+        "edit": "Edit",
+        "delete": "Delete",
+        "deleteConfirm": "Delete time entry for {{ projectName }}?"
+      },
+      "date": {
+        "selectStart": "Select start",
+        "selectEnd": "Select end",
+        "selectMonth": "Select month",
+        "selectDay": "Select day"
+      },
+      "error": {
+        "load": "Unable to load time entries.",
+        "timerRequired": "Project and hourly rate are required.",
+        "manualRequired": "Project, hourly rate, start, and end are required.",
+        "editRequired": "Project, hourly rate, and start are required.",
+        "editEndRequired": "End time is required for completed entries.",
+        "actionFailed": "Action failed. Check overlapping times and required fields."
+      }
+    },
+    "home": {
+      "signedIn": "Signed in",
+      "systemStatus": "System status",
+      "backend": "Backend",
+      "database": "Database",
+      "checking": "Checking backend and database...",
+      "error": {
+        "status": "Unable to load backend status."
+      }
+    },
+    "placeholder": {
+      "title": "Page",
+      "message": "This section is reserved for the next implementation step."
+    }
+  }
+}

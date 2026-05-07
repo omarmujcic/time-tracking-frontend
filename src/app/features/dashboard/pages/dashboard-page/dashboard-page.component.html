@@ -1,0 +1,264 @@
+<section class="dashboard-page">
+  <header class="page-header">
+    <div>
+      <p>{{ 'app.nav.dashboard' | translate }}</p>
+      <h1>{{ translationPath + 'title' | translate }}</h1>
+    </div>
+    <div class="summary-strip">
+      <div>
+        <span>{{ translationPath + 'summary.totalTime' | translate }}</span>
+        <strong>{{ durationLabel(totalSeconds()) }}</strong>
+      </div>
+      <div>
+        <span>{{ translationPath + 'summary.totalAmount' | translate }}</span>
+        <strong>{{ totalAmount() | currency:'EUR':'symbol':'1.2-2' }}</strong>
+      </div>
+      <div>
+        <span>{{ translationPath + 'summary.entries' | translate }}</span>
+        <strong>{{ entryCount() }}</strong>
+      </div>
+    </div>
+  </header>
+
+  @if (loadError(); as error) {
+    <p class="alert page-alert">{{ error }}</p>
+  }
+
+  <section class="tool-grid">
+    <form class="panel timer-panel" (ngSubmit)="startTimer()">
+      <div class="panel-title">
+        <mat-icon aria-hidden="true">play_circle</mat-icon>
+        <h2>{{ translationPath + 'timer.title' | translate }}</h2>
+      </div>
+      @if (timerError(); as error) {
+        <p class="alert">{{ error }}</p>
+      }
+      <div class="timer-fields">
+        <label>
+          <span>{{ translationPath + 'entry.project' | translate }}</span>
+          <input name="timerProject" [(ngModel)]="timerForm.projectName" maxlength="160" required />
+        </label>
+        <label>
+          <span>{{ translationPath + 'entry.hourlyRateEur' | translate }}</span>
+          <input name="timerRate" type="number" min="0.01" step="0.01" [(ngModel)]="timerForm.hourlyRate" required />
+        </label>
+        <label>
+          <span>{{ translationPath + 'entry.description' | translate }}</span>
+          <input name="timerDescription" [(ngModel)]="timerForm.description" maxlength="500" />
+        </label>
+      </div>
+      <button type="submit" [disabled]="loading() || !!activeEntry()">
+        <mat-icon aria-hidden="true">timer</mat-icon>
+        {{ translationPath + 'timer.start' | translate }}
+      </button>
+    </form>
+
+    <form class="panel manual-entry-panel" (ngSubmit)="createManualEntry()">
+      <div class="panel-title">
+        <mat-icon aria-hidden="true">edit_calendar</mat-icon>
+        <h2>{{ translationPath + 'manual.title' | translate }}</h2>
+      </div>
+      @if (manualEntryError(); as error) {
+        <p class="alert">{{ error }}</p>
+      }
+      <div class="form-grid">
+        <label>
+          <span>{{ translationPath + 'entry.project' | translate }}</span>
+          <input name="manualProject" [(ngModel)]="manualForm.projectName" maxlength="160" required />
+        </label>
+        <label>
+          <span>{{ translationPath + 'entry.hourlyRateEur' | translate }}</span>
+          <input name="manualRate" type="number" min="0.01" step="0.01" [(ngModel)]="manualForm.hourlyRate" required />
+        </label>
+        <label>
+          <span>{{ translationPath + 'entry.start' | translate }}</span>
+          <app-date-picker
+            mode="datetime"
+            [placeholder]="translationPath + 'date.selectStart' | translate"
+            [value]="manualForm.startedAt"
+            (valueChange)="manualForm.startedAt = $event"
+          />
+        </label>
+        <label>
+          <span>{{ translationPath + 'entry.end' | translate }}</span>
+          <app-date-picker
+            mode="datetime"
+            [placeholder]="translationPath + 'date.selectEnd' | translate"
+            [value]="manualForm.endedAt"
+            (valueChange)="manualForm.endedAt = $event"
+          />
+        </label>
+        <label class="full-width">
+          <span>{{ translationPath + 'entry.description' | translate }}</span>
+          <input name="manualDescription" [(ngModel)]="manualForm.description" maxlength="500" />
+        </label>
+      </div>
+      <button type="submit" [disabled]="loading()">
+        <mat-icon aria-hidden="true">add</mat-icon>
+        {{ translationPath + 'manual.add' | translate }}
+      </button>
+    </form>
+  </section>
+
+  <section class="panel filters-panel">
+    <div class="panel-title">
+      <mat-icon aria-hidden="true">filter_alt</mat-icon>
+      <h2>{{ translationPath + 'filters.title' | translate }}</h2>
+    </div>
+    @if (filtersError(); as error) {
+      <p class="alert">{{ error }}</p>
+    }
+    <div class="filters-grid">
+      <label>
+        <span>{{ translationPath + 'filters.month' | translate }}</span>
+        <app-date-picker
+          mode="month"
+          [placeholder]="translationPath + 'date.selectMonth' | translate"
+          [value]="filters.month"
+          (valueChange)="filters.month = $event"
+        />
+      </label>
+      <label>
+        <span>{{ translationPath + 'filters.day' | translate }}</span>
+        <app-date-picker
+          mode="date"
+          [placeholder]="translationPath + 'date.selectDay' | translate"
+          [value]="filters.day"
+          (valueChange)="filters.day = $event"
+        />
+      </label>
+      <label>
+        <span>{{ translationPath + 'entry.project' | translate }}</span>
+        <input [(ngModel)]="filters.project" name="filterProject" />
+      </label>
+      <label>
+        <span>{{ translationPath + 'filters.user' | translate }}</span>
+        <select [(ngModel)]="filters.userId" name="filterUser">
+          @if (user(); as currentUser) {
+            <option [value]="currentUser.id">{{ currentUser.displayName || currentUser.username }}</option>
+          }
+        </select>
+      </label>
+      <button type="button" (click)="applyFilters()">
+        <mat-icon aria-hidden="true">search</mat-icon>
+        {{ translationPath + 'filters.apply' | translate }}
+      </button>
+      <button class="secondary" type="button" (click)="clearFilters()">
+        <mat-icon aria-hidden="true">restart_alt</mat-icon>
+        {{ translationPath + 'filters.reset' | translate }}
+      </button>
+    </div>
+  </section>
+
+  <section class="panel entries-panel">
+    <div class="panel-title">
+      <mat-icon aria-hidden="true">list_alt</mat-icon>
+      <h2>{{ translationPath + 'entries.title' | translate }}</h2>
+    </div>
+    @if (entriesError(); as error) {
+      <p class="alert">{{ error }}</p>
+    }
+
+    <div class="entries-list">
+      @if (activeEntry(); as active) {
+        <ng-container [ngTemplateOutlet]="entryRow" [ngTemplateOutletContext]="{ entry: active }" />
+      }
+
+      @for (entry of completedEntries(); track entry.id) {
+        <ng-container [ngTemplateOutlet]="entryRow" [ngTemplateOutletContext]="{ entry }" />
+      } @empty {
+        @if (!activeEntry()) {
+          <p class="empty">{{ translationPath + 'entries.empty' | translate }}</p>
+        }
+      }
+    </div>
+  </section>
+</section>
+
+<ng-template #entryRow let-entry="entry">
+  <article class="entry-row" [class.active-entry]="entry.active">
+    @if (editingEntryId() === entry.id) {
+      <div class="edit-grid">
+        <label>
+          <span>{{ translationPath + 'entry.project' | translate }}</span>
+          <input [(ngModel)]="editForm.projectName" name="editProject{{ entry.id }}" />
+        </label>
+        <label>
+          <span>{{ translationPath + 'entry.rateEur' | translate }}</span>
+          <input type="number" min="0.01" step="0.01" [(ngModel)]="editForm.hourlyRate" name="editRate{{ entry.id }}" />
+        </label>
+        <label>
+          <span>{{ translationPath + 'entry.start' | translate }}</span>
+          <app-date-picker
+            mode="datetime"
+            [placeholder]="translationPath + 'date.selectStart' | translate"
+            [value]="editForm.startedAt"
+            (valueChange)="editForm.startedAt = $event"
+          />
+        </label>
+        <label>
+          <span>{{ translationPath + 'entry.end' | translate }}</span>
+          <app-date-picker
+            mode="datetime"
+            [placeholder]="translationPath + 'entry.running' | translate"
+            [value]="editForm.endedAt"
+            [disabled]="entry.active"
+            (valueChange)="editForm.endedAt = $event"
+          />
+        </label>
+        <label class="wide">
+          <span>{{ translationPath + 'entry.description' | translate }}</span>
+          <input [(ngModel)]="editForm.description" name="editDescription{{ entry.id }}" />
+        </label>
+      </div>
+      <div class="row-actions">
+        <button type="button" (click)="saveEdit(entry)">
+          <mat-icon aria-hidden="true">check</mat-icon>
+          {{ translationPath + 'entry.save' | translate }}
+        </button>
+        <button type="button" class="secondary" (click)="cancelEdit()">
+          <mat-icon aria-hidden="true">close</mat-icon>
+          {{ translationPath + 'entry.cancel' | translate }}
+        </button>
+      </div>
+    } @else {
+      <div class="entry-main">
+        <div class="entry-details">
+          <div class="detail-line">
+            <span>{{ translationPath + 'entry.project' | translate }}</span>
+            <strong>{{ entry.projectName }}</strong>
+          </div>
+          <div class="detail-line">
+            <span>{{ translationPath + 'entry.description' | translate }}</span>
+            <strong>{{ entry.description || (translationPath + 'entry.noDescription' | translate) }}</strong>
+          </div>
+        </div>
+        <div class="entry-meta">
+          <span><strong>{{ translationPath + 'entry.started' | translate }}</strong> {{ entry.startedAt | date:'MMM d, HH:mm:ss' }}</span>
+          <span><strong>{{ translationPath + 'entry.stopped' | translate }}</strong> {{ entry.endedAt ? (entry.endedAt | date:'MMM d, HH:mm:ss') : (translationPath + 'entry.running' | translate) }}</span>
+        </div>
+      </div>
+      <div class="entry-numbers">
+        <strong>{{ durationLabel(liveDuration(entry)) }}</strong>
+        <span>{{ amountFor(entry) | currency:'EUR':'symbol':'1.2-2' }}</span>
+        <small>{{ entry.hourlyRate | currency:'EUR':'symbol':'1.2-2' }}/h</small>
+      </div>
+      <div class="row-actions">
+        @if (entry.active) {
+          <button type="button" (click)="stopTimer(entry)">
+            <mat-icon aria-hidden="true">stop_circle</mat-icon>
+            {{ translationPath + 'entry.stop' | translate }}
+          </button>
+        }
+        <button type="button" class="secondary" (click)="startEdit(entry)">
+          <mat-icon aria-hidden="true">edit</mat-icon>
+          {{ translationPath + 'entry.edit' | translate }}
+        </button>
+        <button type="button" class="danger" (click)="deleteEntry(entry)">
+          <mat-icon aria-hidden="true">delete</mat-icon>
+          {{ translationPath + 'entry.delete' | translate }}
+        </button>
+      </div>
+    }
+  </article>
+</ng-template>

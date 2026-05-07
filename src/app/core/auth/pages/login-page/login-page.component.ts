@@ -2,22 +2,24 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AuthStateFacade } from '../../../../shared/state/auth/auth-state.facade';
 
 type AuthMode = 'login' | 'register';
 
 @Component({
   selector: 'app-login-page',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, TranslatePipe],
   templateUrl: './login-page.component.html',
   styleUrl: './login-page.component.scss'
 })
 export class LoginPageComponent {
+  protected readonly translationPath = 'features.auth.';
   protected readonly mode = signal<AuthMode>('login');
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly title = computed(() => (this.mode() === 'login' ? 'Sign in' : 'Create user'));
-  protected readonly submitLabel = computed(() => (this.mode() === 'login' ? 'Login' : 'Create user'));
+  protected readonly titleKey = computed(() => `${this.translationPath}title.${this.mode()}`);
+  protected readonly submitLabelKey = computed(() => `${this.translationPath}mode.${this.mode()}`);
 
   protected readonly form = new FormGroup({
     username: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -27,7 +29,8 @@ export class LoginPageComponent {
 
   constructor(
     private readonly authState: AuthStateFacade,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly translateService: TranslateService
   ) {}
 
   protected switchMode(mode: AuthMode): void {
@@ -68,9 +71,9 @@ export class LoginPageComponent {
         });
       }
 
-      await this.router.navigateByUrl('/home');
+      await this.router.navigateByUrl('/dashboard');
     } catch {
-      this.error.set(this.mode() === 'login' ? 'Invalid username or password.' : 'Unable to create user.');
+      this.error.set(this.translateService.instant(`${this.translationPath}error.${this.mode()}`));
     } finally {
       this.loading.set(false);
     }

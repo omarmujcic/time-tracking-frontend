@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { LoginPageComponent } from './core/auth/pages/login-page/login-page.component';
+import { AppShellComponent } from './core/layout/app-shell/app-shell.component';
+import { PlaceholderPageComponent } from './features/placeholder/pages/placeholder-page/placeholder-page.component';
 
 export const routes: Routes = [
   {
@@ -8,18 +10,49 @@ export const routes: Routes = [
     component: LoginPageComponent
   },
   {
-    path: 'home',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/home/pages/home-page/home-page.component').then((m) => m.HomePageComponent)
-  },
-  {
     path: '',
-    pathMatch: 'full',
-    redirectTo: 'home'
+    canActivate: [authGuard],
+    component: AppShellComponent,
+    children: [
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./features/dashboard/pages/dashboard-page/dashboard-page.component').then((m) => m.DashboardPageComponent)
+      },
+      {
+        path: 'reports',
+        component: PlaceholderPageComponent,
+        data: { titleKey: 'app.nav.reports', icon: 'monitoring' }
+      },
+      {
+        path: 'import',
+        component: PlaceholderPageComponent,
+        data: { titleKey: 'app.nav.import', icon: 'upload_file' }
+      },
+      {
+        path: 'invoice',
+        component: PlaceholderPageComponent,
+        data: { titleKey: 'app.nav.invoice', icon: 'receipt_long' }
+      },
+      {
+        path: 'calendar',
+        component: PlaceholderPageComponent,
+        data: { titleKey: 'app.nav.calendar', icon: 'calendar_month' }
+      },
+      {
+        path: 'settings',
+        component: PlaceholderPageComponent,
+        data: { titleKey: 'app.nav.settings', icon: 'settings' }
+      },
+      {
+        path: '',
+        pathMatch: 'full',
+        redirectTo: 'dashboard'
+      }
+    ]
   },
   {
     path: '**',
-    redirectTo: 'home'
+    redirectTo: 'dashboard'
   }
 ];
