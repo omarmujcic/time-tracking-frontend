@@ -96,6 +96,70 @@
         "actionFailed": "Action failed. Check overlapping times and required fields."
       }
     },
+    "reports": {
+      "title": "Time reports",
+      "summary": {
+        "completedTime": "Completed time",
+        "completedAmount": "Completed amount",
+        "activeTime": "Active time",
+        "entries": "Entries"
+      },
+      "views": {
+        "DAILY": "Daily",
+        "WEEKLY": "Weekly",
+        "MONTHLY": "Monthly",
+        "YEARLY": "Yearly",
+        "CUSTOM": "Custom"
+      },
+      "filters": {
+        "title": "Report filters",
+        "view": "Report view",
+        "startDate": "Start date",
+        "endDate": "End date",
+        "users": "Users",
+        "allUsers": "All users",
+        "projects": "Projects",
+        "allProjects": "All projects",
+        "minRate": "Min rate EUR",
+        "maxRate": "Max rate EUR",
+        "description": "Description words",
+        "apply": "Apply",
+        "reset": "Reset"
+      },
+      "charts": {
+        "timeTitle": "Worked time by period",
+        "projectTitle": "Worked time by project",
+        "hours": "Hours"
+      },
+      "projects": {
+        "empty": "No completed project time matches these filters."
+      },
+      "entries": {
+        "title": "Detailed entries",
+        "countLabel": "entries",
+        "empty": "No time entries match these filters."
+      },
+      "entry": {
+        "user": "User",
+        "project": "Project",
+        "description": "Description",
+        "noDescription": "No description",
+        "rate": "Rate",
+        "time": "Time",
+        "amount": "Amount",
+        "running": "Running"
+      },
+      "exports": {
+        "csv": "CSV",
+        "pdf": "PDF"
+      },
+      "print": {
+        "range": "Report range"
+      },
+      "error": {
+        "load": "Unable to load reports."
+      }
+    },
     "home": {
       "signedIn": "Signed in",
       "systemStatus": "System status",

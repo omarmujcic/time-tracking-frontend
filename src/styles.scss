@@ -28,3 +28,28 @@ mat-icon {
   -webkit-font-feature-settings: "liga";
   -webkit-font-smoothing: antialiased;
 }
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #ffffff;
+  }
+
+  .app-shell {
+    min-height: auto !important;
+    display: block !important;
+    background: #ffffff !important;
+  }
+
+  .sidebar {
+    display: none !important;
+  }
+
+  .content {
+    display: block !important;
+  }
+}
