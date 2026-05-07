@@ -1,0 +1,24 @@
+<label class="multi-select-field">
+  <span>{{ label }}</span>
+  <button type="button" class="select-trigger" [class.placeholder]="!selectedValues.length" (click)="toggleOpen()">
+    <strong>{{ displayValue }}</strong>
+    <mat-icon aria-hidden="true">{{ open() ? 'expand_less' : 'expand_more' }}</mat-icon>
+  </button>
+  @if (open()) {
+    <div class="options-panel">
+      @for (option of sortedOptions; track option.value) {
+        <button
+          type="button"
+          class="option-row"
+          [class.selected]="isSelected(option.value)"
+          (click)="toggleValue(option.value)"
+        >
+          <mat-icon aria-hidden="true">{{ isSelected(option.value) ? 'check' : '' }}</mat-icon>
+          <span>{{ option.label }}</span>
+        </button>
+      } @empty {
+        <p>No options</p>
+      }
+    </div>
+  }
+</label>

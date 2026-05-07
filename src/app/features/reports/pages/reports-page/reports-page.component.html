@@ -1,0 +1,247 @@
+<section class="reports-page">
+  <header class="page-header">
+    <div>
+      <p>{{ 'app.nav.reports' | translate }}</p>
+      <h1>{{ translationPath + 'title' | translate }}</h1>
+    </div>
+    @if (report(); as currentReport) {
+      <div class="summary-strip">
+        <div>
+          <span>{{ translationPath + 'summary.completedTime' | translate }}</span>
+          <strong>{{ durationLabel(currentReport.summary.totalSeconds) }}</strong>
+        </div>
+        <div>
+          <span>{{ translationPath + 'summary.completedAmount' | translate }}</span>
+          <strong>{{ currentReport.summary.totalAmount | currency:'EUR':'symbol':'1.2-2' }}</strong>
+        </div>
+        <div>
+          <span>{{ translationPath + 'summary.activeTime' | translate }}</span>
+          <strong>{{ durationLabel(currentReport.summary.activeSeconds) }}</strong>
+        </div>
+        <div>
+          <span>{{ translationPath + 'summary.entries' | translate }}</span>
+          <strong>{{ currentReport.summary.entryCount }}</strong>
+        </div>
+      </div>
+    }
+  </header>
+
+  @if (loadError(); as error) {
+    <p class="alert page-alert">{{ error }}</p>
+  }
+
+  <section class="panel filters-panel no-print">
+    <div class="panel-heading">
+      <div class="panel-title">
+        <mat-icon aria-hidden="true">tune</mat-icon>
+        <h2>{{ translationPath + 'filters.title' | translate }}</h2>
+      </div>
+      <div class="export-actions">
+        <button type="button" class="secondary" (click)="exportCsv()" [disabled]="!report()">
+          <mat-icon aria-hidden="true">download</mat-icon>
+          {{ translationPath + 'exports.csv' | translate }}
+        </button>
+        <button type="button" class="secondary" (click)="exportPdf()" [disabled]="!report()">
+          <mat-icon aria-hidden="true">print</mat-icon>
+          {{ translationPath + 'exports.pdf' | translate }}
+        </button>
+      </div>
+    </div>
+    <div class="view-tabs" role="tablist" [attr.aria-label]="translationPath + 'filters.view' | translate">
+      @for (view of viewOptions; track view) {
+        <button
+          type="button"
+          class="tab-button"
+          [class.active]="filters.view === view"
+          (click)="applyView(view)"
+        >
+          {{ translationPath + 'views.' + view | translate }}
+        </button>
+      }
+    </div>
+    <div class="filters-grid">
+      <label>
+        <span>{{ translationPath + 'filters.startDate' | translate }}</span>
+        <app-date-picker
+          mode="date"
+          [placeholder]="translationPath + 'filters.startDate' | translate"
+          [value]="filters.startDate"
+          (valueChange)="filters.startDate = $event"
+        />
+      </label>
+      <label>
+        <span>{{ translationPath + 'filters.endDate' | translate }}</span>
+        <app-date-picker
+          mode="date"
+          [placeholder]="translationPath + 'filters.endDate' | translate"
+          [value]="filters.endDate"
+          (valueChange)="filters.endDate = $event"
+        />
+      </label>
+      <app-report-multi-select
+        [label]="translationPath + 'filters.users' | translate"
+        [placeholder]="translationPath + 'filters.allUsers' | translate"
+        [options]="userOptions()"
+        [(selectedValues)]="filters.userIds"
+      />
+      <app-report-multi-select
+        [label]="translationPath + 'filters.projects' | translate"
+        [placeholder]="translationPath + 'filters.allProjects' | translate"
+        [options]="projectOptions()"
+        [(selectedValues)]="filters.projectNames"
+      />
+      <label>
+        <span>{{ translationPath + 'filters.minRate' | translate }}</span>
+        <input type="number" min="0" step="0.01" name="minRate" [(ngModel)]="filters.minRate" />
+      </label>
+      <label>
+        <span>{{ translationPath + 'filters.maxRate' | translate }}</span>
+        <input type="number" min="0" step="0.01" name="maxRate" [(ngModel)]="filters.maxRate" />
+      </label>
+      <label class="wide">
+        <span>{{ translationPath + 'filters.description' | translate }}</span>
+        <input name="description" [(ngModel)]="filters.description" maxlength="500" />
+      </label>
+      <div class="filter-actions">
+        <button type="button" (click)="applyFilters()" [disabled]="loading()">
+          <mat-icon aria-hidden="true">search</mat-icon>
+          {{ translationPath + 'filters.apply' | translate }}
+        </button>
+        <button type="button" class="secondary" (click)="resetFilters()" [disabled]="loading()">
+          <mat-icon aria-hidden="true">restart_alt</mat-icon>
+          {{ translationPath + 'filters.reset' | translate }}
+        </button>
+      </div>
+    </div>
+  </section>
+
+  @if (report(); as currentReport) {
+    <section class="print-meta">
+      <strong>{{ translationPath + 'print.range' | translate }}</strong>
+      {{ filters.startDate }} - {{ filters.endDate }}
+    </section>
+
+    <section class="report-grid">
+      <article class="panel time-chart-panel">
+        <div class="panel-title">
+          <mat-icon aria-hidden="true">bar_chart</mat-icon>
+          <h2>{{ translationPath + 'charts.timeTitle' | translate }}</h2>
+        </div>
+        <div class="chart-frame">
+          <canvas #timeChartCanvas></canvas>
+        </div>
+      </article>
+
+      <article class="panel project-chart-panel">
+        <div class="panel-title">
+          <mat-icon aria-hidden="true">donut_large</mat-icon>
+          <h2>{{ translationPath + 'charts.projectTitle' | translate }}</h2>
+        </div>
+        <div class="project-content">
+          <div class="donut-frame">
+            <canvas #projectChartCanvas></canvas>
+          </div>
+          <div class="project-list">
+            @for (project of currentReport.projects; track project.projectName) {
+              <div class="project-row">
+                <div>
+                  <strong>{{ project.projectName }}</strong>
+                  <span>{{ durationLabel(project.totalSeconds) }} · {{ project.totalAmount | currency:'EUR':'symbol':'1.2-2' }}</span>
+                </div>
+                <div class="project-share">
+                  <span>{{ project.percentage }}%</span>
+                  <div><i [style.width.%]="project.percentage"></i></div>
+                </div>
+              </div>
+            } @empty {
+              <p class="empty">{{ translationPath + 'projects.empty' | translate }}</p>
+            }
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel entries-panel">
+      <div class="panel-title">
+        <mat-icon aria-hidden="true">table_rows</mat-icon>
+        <h2>{{ translationPath + 'entries.title' | translate }}</h2>
+      </div>
+      <div class="entries-list screen-entries-list">
+        @for (group of projectEntryGroups(); track group.key) {
+          <article class="project-entry-group">
+            <button type="button" class="project-entry-summary" (click)="toggleProject(group.projectName)">
+              <mat-icon aria-hidden="true">{{ isProjectExpanded(group.projectName) ? 'expand_less' : 'expand_more' }}</mat-icon>
+              <strong>{{ group.projectName }}</strong>
+              <span>{{ group.entries.length }} {{ translationPath + 'entries.countLabel' | translate }}</span>
+              <span>{{ durationLabel(group.totalSeconds) }}</span>
+              <span>{{ group.totalAmount | currency:'EUR':'symbol':'1.2-2' }}</span>
+            </button>
+            @if (isProjectExpanded(group.projectName)) {
+              <div class="entry-table">
+                <div class="entry-head">
+                  <span>{{ translationPath + 'entry.user' | translate }}</span>
+                  <span>{{ translationPath + 'entry.description' | translate }}</span>
+                  <span>{{ translationPath + 'entry.rate' | translate }}</span>
+                  <span>{{ translationPath + 'entry.time' | translate }}</span>
+                  <span>{{ translationPath + 'entry.amount' | translate }}</span>
+                </div>
+                @for (entry of group.entries; track entry.id) {
+                  <div class="entry-row" [class.active-entry]="entry.active">
+                    <span>{{ entry.displayName || entry.username }}</span>
+                    <span>{{ entry.description || (translationPath + 'entry.noDescription' | translate) }}</span>
+                    <span>{{ entry.hourlyRate | currency:'EUR':'symbol':'1.2-2' }}/h</span>
+                    <span class="time-cell">
+                      <strong>{{ durationLabel(entry.durationSeconds) }}</strong>
+                      <small>
+                        {{ entry.startedAt | date:'MMM d, HH:mm' }} -
+                        {{ entry.endedAt ? (entry.endedAt | date:'MMM d, HH:mm') : (translationPath + 'entry.running' | translate) }}
+                      </small>
+                    </span>
+                    <span>{{ entry.billableAmount | currency:'EUR':'symbol':'1.2-2' }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </article>
+        } @empty {
+          <p class="empty">{{ translationPath + 'entries.empty' | translate }}</p>
+        }
+      </div>
+      <div class="entries-list print-entries-list">
+        @for (group of groupedEntries(); track group.key) {
+          <article class="entry-group">
+            <h3>{{ group.label }}</h3>
+            <div class="entry-table">
+              <div class="entry-head">
+                <span>{{ translationPath + 'entry.user' | translate }}</span>
+                <span>{{ translationPath + 'entry.project' | translate }}</span>
+                <span>{{ translationPath + 'entry.description' | translate }}</span>
+                <span>{{ translationPath + 'entry.rate' | translate }}</span>
+                <span>{{ translationPath + 'entry.time' | translate }}</span>
+                <span>{{ translationPath + 'entry.amount' | translate }}</span>
+              </div>
+              @for (entry of group.entries; track entry.id) {
+                <div class="entry-row print-entry-row" [class.active-entry]="entry.active">
+                  <span>{{ entry.displayName || entry.username }}</span>
+                  <strong>{{ entry.projectName }}</strong>
+                  <span>{{ entry.description || (translationPath + 'entry.noDescription' | translate) }}</span>
+                  <span>{{ entry.hourlyRate | currency:'EUR':'symbol':'1.2-2' }}/h</span>
+                  <span class="time-cell">
+                    <strong>{{ durationLabel(entry.durationSeconds) }}</strong>
+                    <small>
+                      {{ entry.startedAt | date:'MMM d, HH:mm' }} -
+                      {{ entry.endedAt ? (entry.endedAt | date:'MMM d, HH:mm') : (translationPath + 'entry.running' | translate) }}
+                    </small>
+                  </span>
+                  <span>{{ entry.billableAmount | currency:'EUR':'symbol':'1.2-2' }}</span>
+                </div>
+              }
+            </div>
+          </article>
+        } @empty {
+          <p class="empty">{{ translationPath + 'entries.empty' | translate }}</p>
+        }
+      </div>
+    </section>
+  }
+</section>

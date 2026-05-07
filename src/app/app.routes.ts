@@ -21,8 +21,8 @@ export const routes: Routes = [
       },
       {
         path: 'reports',
-        component: PlaceholderPageComponent,
-        data: { titleKey: 'app.nav.reports', icon: 'monitoring' }
+        loadComponent: () =>
+          import('./features/reports/pages/reports-page/reports-page.component').then((m) => m.ReportsPageComponent)
       },
       {
         path: 'import',
