@@ -2,25 +2,25 @@
   <section class="home-panel">
     <header>
       <div>
-        <p>Signed in</p>
+        <p>{{ translationPath + 'signedIn' | translate }}</p>
         <h1>{{ user()?.displayName || user()?.username }}</h1>
       </div>
-      <button type="button" (click)="logout()">Logout</button>
+      <button type="button" (click)="logout()">{{ 'app.logout' | translate }}</button>
     </header>
 
     @if (status(); as apiStatus) {
-      <div class="status-grid" aria-label="System status">
+      <div class="status-grid" [attr.aria-label]="translationPath + 'systemStatus' | translate">
         <div>
-          <span>Backend</span>
+          <span>{{ translationPath + 'backend' | translate }}</span>
           <strong>{{ apiStatus.backend }}</strong>
         </div>
         <div>
-          <span>Database</span>
+          <span>{{ translationPath + 'database' | translate }}</span>
           <strong>{{ apiStatus.database }}</strong>
         </div>
       </div>
     } @else {
-      <p class="message">{{ statusError() || 'Checking backend and database...' }}</p>
+      <p class="message">{{ statusError() || (translationPath + 'checking' | translate) }}</p>
     }
   </section>
 </main>

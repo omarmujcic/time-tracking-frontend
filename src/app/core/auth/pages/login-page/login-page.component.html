@@ -1,30 +1,34 @@
 <main class="auth-page">
   <section class="auth-panel" aria-labelledby="auth-title">
     <div class="auth-heading">
-      <p>Time Tracking</p>
-      <h1 id="auth-title">{{ title() }}</h1>
+      <p>{{ 'app.brand' | translate }}</p>
+      <h1 id="auth-title">{{ titleKey() | translate }}</h1>
     </div>
 
-    <div class="mode-switch" role="group" aria-label="Authentication mode">
-      <button type="button" [class.active]="mode() === 'login'" (click)="switchMode('login')">Login</button>
-      <button type="button" [class.active]="mode() === 'register'" (click)="switchMode('register')">New user</button>
+    <div class="mode-switch" role="group" [attr.aria-label]="translationPath + 'mode.label' | translate">
+      <button type="button" [class.active]="mode() === 'login'" (click)="switchMode('login')">
+        {{ translationPath + 'mode.login' | translate }}
+      </button>
+      <button type="button" [class.active]="mode() === 'register'" (click)="switchMode('register')">
+        {{ translationPath + 'mode.register' | translate }}
+      </button>
     </div>
 
     <form [formGroup]="form" (ngSubmit)="submit()">
       <label>
-        <span>Username</span>
+        <span>{{ translationPath + 'form.username' | translate }}</span>
         <input type="text" formControlName="username" autocomplete="username" />
       </label>
 
       @if (mode() === 'register') {
         <label>
-          <span>Display name</span>
+          <span>{{ translationPath + 'form.displayName' | translate }}</span>
           <input type="text" formControlName="displayName" autocomplete="name" />
         </label>
       }
 
       <label>
-        <span>Password</span>
+        <span>{{ translationPath + 'form.password' | translate }}</span>
         <input
           type="password"
           formControlName="password"
@@ -37,7 +41,7 @@
       }
 
       <button class="submit" type="submit" [disabled]="loading()">
-        {{ loading() ? 'Please wait...' : submitLabel() }}
+        {{ loading() ? (translationPath + 'form.pleaseWait' | translate) : (submitLabelKey() | translate) }}
       </button>
     </form>
   </section>

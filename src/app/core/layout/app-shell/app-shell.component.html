@@ -1,0 +1,43 @@
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" routerLink="/dashboard" [attr.aria-label]="translationPath + 'brand' | translate">
+      <span class="brand-mark">{{ translationPath + 'brandMark' | translate }}</span>
+      <span>{{ translationPath + 'brand' | translate }}</span>
+    </a>
+
+    <nav [attr.aria-label]="translationPath + 'nav.primary' | translate">
+      @for (item of navItems; track item.path) {
+        @if (item.disabled) {
+          <span class="nav-item disabled" aria-disabled="true">
+            <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+            <span>{{ item.labelKey | translate }}</span>
+          </span>
+        } @else {
+          <a
+            class="nav-item"
+            [routerLink]="item.path"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+            <span>{{ item.labelKey | translate }}</span>
+          </a>
+        }
+      }
+    </nav>
+
+    <div class="account">
+      <div>
+        <span>{{ user()?.displayName || user()?.username }}</span>
+        <small>{{ user()?.username }}</small>
+      </div>
+      <button type="button" [title]="translationPath + 'logout' | translate" (click)="logout()">
+        <mat-icon aria-hidden="true">logout</mat-icon>
+      </button>
+    </div>
+  </aside>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>

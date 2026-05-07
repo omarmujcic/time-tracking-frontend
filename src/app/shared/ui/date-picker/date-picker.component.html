@@ -1,0 +1,63 @@
+<button class="picker-button" type="button" [disabled]="disabled" (click)="toggle($event)">
+  <span [class.placeholder]="!valueState()">{{ displayValue() }}</span>
+  <mat-icon aria-hidden="true">{{ mode === 'month' ? 'calendar_month' : 'event' }}</mat-icon>
+</button>
+
+@if (open()) {
+  <div class="picker-popover" (click)="keepOpen($event)">
+    <div class="picker-header">
+      <button type="button" (click)="previous()">
+        <mat-icon aria-hidden="true">chevron_left</mat-icon>
+      </button>
+      <strong>{{ mode === 'month' ? viewDate().getFullYear() : headerLabel() }}</strong>
+      <button type="button" (click)="next()">
+        <mat-icon aria-hidden="true">chevron_right</mat-icon>
+      </button>
+    </div>
+
+    @if (mode === 'month') {
+      <div class="month-grid">
+        @for (month of monthNames; track month; let index = $index) {
+          <button type="button" [class.selected]="isSelectedMonth(index)" (click)="selectMonth(index)">
+            {{ month }}
+          </button>
+        }
+      </div>
+    } @else {
+      <div class="weekday-grid">
+        @for (day of weekDays; track day) {
+          <span>{{ day }}</span>
+        }
+      </div>
+      <div class="day-grid">
+        @for (day of calendarDays(); track day.date.toISOString()) {
+          <button
+            type="button"
+            [class.outside]="day.outside"
+            [class.selected]="day.selected"
+            (click)="selectDay(day)"
+          >
+            {{ day.label }}
+          </button>
+        }
+      </div>
+
+      @if (mode === 'datetime') {
+        <div class="time-grid">
+          <label>
+            <span>HH</span>
+            <input type="number" min="0" max="23" [value]="timePart('hours')" (input)="updateTime('hours', $event)" />
+          </label>
+          <label>
+            <span>MM</span>
+            <input type="number" min="0" max="59" [value]="timePart('minutes')" (input)="updateTime('minutes', $event)" />
+          </label>
+          <label>
+            <span>SS</span>
+            <input type="number" min="0" max="59" [value]="timePart('seconds')" (input)="updateTime('seconds', $event)" />
+          </label>
+        </div>
+      }
+    }
+  </div>
+}
