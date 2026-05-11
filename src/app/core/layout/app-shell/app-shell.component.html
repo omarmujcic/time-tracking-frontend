@@ -27,13 +27,29 @@
     </nav>
 
     <div class="account">
-      <div>
-        <span>{{ user()?.displayName || user()?.username }}</span>
-        <small>{{ user()?.username }}</small>
-      </div>
+      <button type="button" class="account-trigger" (click)="toggleAccountMenu()" aria-haspopup="menu" [attr.aria-expanded]="accountMenuOpen()">
+        <span>{{ user()?.username }}</span>
+        <small>{{ accountTypeLabel() }}</small>
+      </button>
       <button type="button" [title]="translationPath + 'logout' | translate" (click)="logout()">
         <mat-icon aria-hidden="true">logout</mat-icon>
       </button>
+      @if (accountMenuOpen()) {
+        <div class="account-menu" role="menu">
+          @for (workspace of workspaces(); track workspace.type + ':' + workspace.organizationId) {
+            <button
+              type="button"
+              role="menuitemradio"
+              [class.active]="workspace.active"
+              [attr.aria-checked]="workspace.active"
+              (click)="selectWorkspace(workspace.type === 'ORGANIZATION' ? 'ORGANIZATION:' + workspace.organizationId : 'PERSONAL')"
+            >
+              <mat-icon aria-hidden="true">{{ workspace.type === 'ORGANIZATION' ? 'domain' : 'person' }}</mat-icon>
+              <span>{{ workspaceLabel(workspace.type, workspace.name) }}</span>
+            </button>
+          }
+        </div>
+      }
     </div>
   </aside>
 

@@ -165,3 +165,58 @@
   border-radius: 6px;
   font: inherit;
 }
+
+:host-context([data-theme='dark']) {
+  .picker-button,
+  .picker-popover,
+  .time-grid input {
+    border-color: #3a403d;
+    background: #151817;
+    color: #e3dfd7;
+  }
+
+  .picker-button:focus {
+    border-color: #70aa99;
+    outline-color: rgba(112, 170, 153, 0.22);
+  }
+
+  .picker-button mat-icon,
+  .picker-header button,
+  .day-grid button,
+  .month-grid button {
+    color: #d7d2c9;
+  }
+
+  .placeholder,
+  .weekday-grid span,
+  .time-grid span,
+  .day-grid button.outside {
+    color: #aaa49a;
+  }
+
+  .picker-header strong {
+    color: #e3dfd7;
+  }
+
+  .picker-popover {
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+  }
+
+  .day-grid button:hover,
+  .month-grid button:hover,
+  .picker-header button:hover {
+    background: #23352f;
+    color: #9ed7c6;
+  }
+
+  .day-grid button.selected,
+  .month-grid button.selected {
+    border-color: #1f7d68;
+    background: #1f7d68;
+    color: #f5f1ea;
+  }
+
+  .time-grid {
+    border-top-color: #343a37;
+  }
+}

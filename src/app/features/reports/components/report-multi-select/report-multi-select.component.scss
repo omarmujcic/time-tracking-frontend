@@ -86,6 +86,50 @@
   cursor: pointer;
 }
 
+.create-option {
+  color: colors.$color-accent;
+  font-weight: 800;
+}
+
+.create-option-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px 34px;
+  gap: 6px;
+  padding: 4px;
+  border-bottom: 1px solid colors.$color-border;
+  margin-bottom: 4px;
+
+  input {
+    width: 100%;
+    min-height: 34px;
+    border: 1px solid colors.$color-border-strong;
+    border-radius: 6px;
+    background: colors.$color-surface;
+    color: colors.$color-text;
+    font: inherit;
+    padding: 0 10px;
+  }
+
+  button {
+    width: 34px;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid colors.$color-accent;
+    border-radius: 6px;
+    background: colors.$color-accent;
+    color: #ffffff;
+    cursor: pointer;
+  }
+
+  button.secondary {
+    border-color: colors.$color-border-strong;
+    background: colors.$color-surface;
+    color: colors.$color-icon;
+  }
+}
+
 .option-row.selected {
   background: colors.$color-surface-selected;
   color: colors.$color-accent;
@@ -113,4 +157,66 @@ p {
   padding: 10px;
   color: colors.$color-muted;
   font-size: 0.82rem;
+}
+
+:host-context([data-theme='dark']) {
+  .multi-select-field > span,
+  .select-trigger.placeholder strong,
+  .select-trigger mat-icon,
+  p {
+    color: #aaa49a;
+  }
+
+  .select-trigger,
+  .options-panel {
+    border-color: #3a403d;
+    background: #151817;
+    color: #e3dfd7;
+  }
+
+  .select-trigger:focus,
+  .select-trigger:focus-visible {
+    border-color: #70aa99;
+    outline-color: rgba(112, 170, 153, 0.22);
+  }
+
+  .options-panel {
+    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.35);
+  }
+
+  .option-row {
+    color: #e3dfd7;
+  }
+
+  .create-option-row {
+    border-bottom-color: #3a403d;
+
+    input {
+      border-color: #3a403d;
+      background: #151817;
+      color: #e3dfd7;
+    }
+
+    button {
+      border-color: #1f7d68;
+      background: #1f7d68;
+      color: #f5f1ea;
+    }
+
+    button.secondary {
+      border-color: #59645f;
+      background: #222823;
+      color: #d7d2c9;
+    }
+  }
+
+  .option-row.selected,
+  .option-row:hover {
+    background: #23352f;
+    color: #9ed7c6;
+  }
+
+  .option-row mat-icon {
+    color: #70aa99;
+  }
 }

@@ -1,5 +1,6 @@
 import { Component, EventEmitter, HostListener, Input, Output, computed, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
+import { formatUserDate, formatUserMonth } from '../../utils/user-formatting';
 import { CalendarDay, DatePickerMode } from './models/date-picker.model';
 
 @Component({
@@ -12,6 +13,9 @@ export class DatePickerComponent {
   @Input() mode: DatePickerMode = 'date';
   @Input() placeholder = 'Select date';
   @Input() disabled = false;
+  @Input() set dateFormat(value: string) {
+    this.dateFormatState.set(value || 'YYYY-MM-DD');
+  }
   @Input() set value(value: string) {
     this.valueState.set(value || '');
     this.viewDate.set(this.parseValue(value) ?? new Date());
@@ -21,6 +25,7 @@ export class DatePickerComponent {
   protected readonly open = signal(false);
   protected readonly valueState = signal('');
   protected readonly viewDate = signal(new Date());
+  protected readonly dateFormatState = signal('YYYY-MM-DD');
   protected readonly weekDays = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
   protected readonly monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   protected readonly displayValue = computed(() => this.formatDisplayValue());
@@ -141,6 +146,10 @@ export class DatePickerComponent {
       const [year, month] = value.split('-').map(Number);
       return new Date(year, month - 1, 1);
     }
+    if (this.mode === 'date') {
+      const [year, month, day] = value.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
     return new Date(value);
   }
 
@@ -155,19 +164,12 @@ export class DatePickerComponent {
       return this.placeholder;
     }
     if (this.mode === 'month') {
-      return selected.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      return formatUserMonth(selected, this.dateFormatState());
     }
     if (this.mode === 'datetime') {
-      return selected.toLocaleString(undefined, {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
+      return `${formatUserDate(selected, this.dateFormatState())}, ${this.pad(selected.getHours())}:${this.pad(selected.getMinutes())}:${this.pad(selected.getSeconds())}`;
     }
-    return selected.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return formatUserDate(selected, this.dateFormatState());
   }
 
   private formatDate(date: Date): string {

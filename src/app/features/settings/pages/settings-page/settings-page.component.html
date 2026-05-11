@@ -1,0 +1,326 @@
+<section class="settings-page">
+  <header class="page-header">
+    <div>
+      <p>Settings</p>
+      <h1>Manage workspace and app preferences</h1>
+    </div>
+    <label class="search-box">
+      <mat-icon aria-hidden="true">search</mat-icon>
+      <input
+        name="settingsSearch"
+        [ngModel]="search()"
+        (ngModelChange)="search.set($event)"
+        placeholder="Search settings"
+      />
+    </label>
+  </header>
+
+  @if (message(); as text) {
+    <p class="notice success">{{ text }}</p>
+  }
+  @if (error(); as text) {
+    <p class="notice error">{{ text }}</p>
+  }
+
+  @if (search().trim()) {
+    <div class="search-summary">
+      @if (searchMatches().length) {
+        <span>{{ searchMatches().length }} matching section(s)</span>
+      } @else {
+        <span>No settings match this search.</span>
+      }
+    </div>
+  }
+
+  @if (matchesSection('account')) {
+    <section class="settings-section">
+      <div class="section-title">
+        <mat-icon aria-hidden="true">account_circle</mat-icon>
+        <h2>Account</h2>
+      </div>
+      <form class="settings-grid" (ngSubmit)="saveProfile()">
+        <label>
+          <span>Display name</span>
+          <input name="displayName" [(ngModel)]="profile.displayName" maxlength="160" required />
+        </label>
+        <label>
+          <span>Username</span>
+          <input name="username" [(ngModel)]="profile.username" maxlength="120" required />
+        </label>
+        <label>
+          <span>Email</span>
+          <input name="email" type="email" [(ngModel)]="profile.email" maxlength="254" />
+        </label>
+        <label>
+          <span>Phone</span>
+          <input name="phone" [(ngModel)]="profile.phone" maxlength="40" />
+        </label>
+        <button type="submit" [disabled]="loading()">
+          <mat-icon aria-hidden="true">save</mat-icon>
+          Save account
+        </button>
+      </form>
+
+      <form class="settings-grid password-grid" (ngSubmit)="savePassword()">
+        <label>
+          <span>Current password</span>
+          <input name="currentPassword" type="password" [(ngModel)]="passwordForm.currentPassword" required />
+        </label>
+        <label>
+          <span>New password</span>
+          <input name="newPassword" type="password" [(ngModel)]="passwordForm.newPassword" minlength="8" required />
+        </label>
+        <label>
+          <span>Confirm password</span>
+          <input name="confirmPassword" type="password" [(ngModel)]="passwordForm.confirmPassword" required />
+        </label>
+        <button type="submit" [disabled]="loading()">
+          <mat-icon aria-hidden="true">lock_reset</mat-icon>
+          Change password
+        </button>
+      </form>
+    </section>
+  }
+
+  @if (matchesSection('app')) {
+    <section class="settings-section">
+      <div class="section-title">
+        <mat-icon aria-hidden="true">tune</mat-icon>
+        <h2>App</h2>
+      </div>
+      <form class="settings-grid" (ngSubmit)="savePreferences()">
+        <app-report-multi-select
+          label="Language"
+          placeholder="Select language"
+          [options]="languageOptions"
+          [multiple]="false"
+          [selectedValues]="selectedValue(preferences.language)"
+          (selectedValuesChange)="updateLanguage($event)"
+        />
+        <app-report-multi-select
+          label="Theme"
+          placeholder="Select theme"
+          [options]="themeOptions"
+          [multiple]="false"
+          [selectedValues]="selectedValue(preferences.themeMode)"
+          (selectedValuesChange)="updateTheme($event)"
+        />
+        <app-report-multi-select
+          label="Date format"
+          placeholder="Select date format"
+          [options]="dateFormatOptions"
+          [multiple]="false"
+          [selectedValues]="selectedValue(preferences.dateFormat)"
+          (selectedValuesChange)="updateDateFormat($event)"
+        />
+        <app-report-multi-select
+          label="Decimal separator"
+          placeholder="Select decimal separator"
+          [options]="decimalSeparatorOptions"
+          [multiple]="false"
+          [selectedValues]="selectedValue(preferences.decimalSeparator)"
+          (selectedValuesChange)="updateDecimalSeparator($event)"
+        />
+        <app-report-multi-select
+          label="Time zone"
+          placeholder="Select time zone"
+          [options]="timeZoneOptions"
+          [multiple]="false"
+          [selectedValues]="selectedValue(preferences.timezone)"
+          (selectedValuesChange)="updateTimezone($event)"
+        />
+        <label class="toggle-row">
+          <input name="groupedEntriesEnabled" type="checkbox" [(ngModel)]="preferences.groupedEntriesEnabled" />
+          <span>Group time entries by default</span>
+        </label>
+        <button type="submit" [disabled]="loading()">
+          <mat-icon aria-hidden="true">save</mat-icon>
+          Save app settings
+        </button>
+      </form>
+    </section>
+  }
+
+  @if (matchesSection('projects')) {
+    <section class="settings-section">
+      <div class="section-title">
+        <mat-icon aria-hidden="true">work</mat-icon>
+        <h2>Projects</h2>
+        @if (activeWorkspace(); as workspace) {
+          <span class="section-meta">{{ workspace.name }} workspace</span>
+        }
+      </div>
+      <form class="settings-grid" (ngSubmit)="saveProject()">
+        <label>
+          <span>Project name</span>
+          <input name="projectName" [(ngModel)]="projectForm.name" maxlength="160" required />
+        </label>
+        <app-report-multi-select
+          label="Status"
+          placeholder="Select status"
+          [options]="statusOptions"
+          [multiple]="false"
+          [selectedValues]="selectedValue(projectForm.status)"
+          (selectedValuesChange)="updateProjectStatus($event)"
+        />
+        <label>
+          <span>Hourly rate EUR</span>
+          <input
+            name="projectRate"
+            type="text"
+            inputmode="decimal"
+            [ngModel]="rateInput(projectForm.hourlyRate)"
+            (ngModelChange)="updateProjectRate($event)"
+            required
+          />
+        </label>
+        <button type="submit" [disabled]="loading()">
+          <mat-icon aria-hidden="true">{{ projectForm.id ? 'check' : 'add' }}</mat-icon>
+          {{ projectForm.id ? 'Update project' : 'Add project' }}
+        </button>
+      </form>
+
+      <div class="project-list">
+        @for (project of projects(); track project.id) {
+          <article class="project-row">
+            <div>
+              <strong>{{ project.name }}</strong>
+              <span>{{ project.status.toLowerCase() }} · {{ rateLabel(project.hourlyRate) }} EUR/h</span>
+            </div>
+            <div class="row-actions">
+              <button type="button" (click)="editProject(project)">
+                <mat-icon aria-hidden="true">edit</mat-icon>
+                Edit
+              </button>
+              <button type="button" class="danger" (click)="deleteProject(project)">
+                <mat-icon aria-hidden="true">delete</mat-icon>
+                Delete
+              </button>
+              <button type="button" class="secondary" (click)="editTask(project)">
+                <mat-icon aria-hidden="true">add_task</mat-icon>
+                Add task
+              </button>
+            </div>
+          </article>
+        } @empty {
+          <p class="empty">No projects in this workspace yet.</p>
+        }
+      </div>
+
+      @if (taskForm; as form) {
+        <form class="settings-grid task-editor" (ngSubmit)="saveTask()">
+          <label>
+            <span>Task name</span>
+            <input name="taskName" [(ngModel)]="form.name" maxlength="160" required />
+          </label>
+          <app-report-multi-select
+            label="Status"
+            placeholder="Select status"
+            [options]="statusOptions"
+            [multiple]="false"
+            [selectedValues]="selectedValue(form.status)"
+            (selectedValuesChange)="updateTaskStatus(form, $event)"
+          />
+          <button type="submit" [disabled]="loading()">
+            <mat-icon aria-hidden="true">check</mat-icon>
+            Save task
+          </button>
+        </form>
+      }
+    </section>
+  }
+
+  @if (matchesSection('organization')) {
+    <section class="settings-section">
+      <div class="section-title">
+        <mat-icon aria-hidden="true">domain</mat-icon>
+        <h2>Organization</h2>
+        @if (activeWorkspace(); as workspace) {
+          <span class="section-meta">{{ workspace.name }} · {{ roleLabel(workspace.role) }}</span>
+        }
+      </div>
+
+      <div class="organization-list">
+        <h3>Your organizations</h3>
+        @for (workspace of organizationWorkspaces(); track workspace.organizationId) {
+          <article class="organization-row" [class.active]="workspace.active">
+            <div>
+              <strong>{{ workspace.name }}</strong>
+              <span>{{ roleLabel(workspace.role) }} · {{ workspace.active ? 'active' : 'available' }}</span>
+            </div>
+            <div class="row-actions">
+              @if (!workspace.active) {
+                <button type="button" class="secondary" (click)="switchWorkspace(workspace)" [disabled]="loading()">
+                  <mat-icon aria-hidden="true">swap_horiz</mat-icon>
+                  Switch
+                </button>
+              } @else {
+                <span class="active-badge">Current workspace</span>
+              }
+            </div>
+          </article>
+        } @empty {
+          <p class="empty">No organizations joined yet.</p>
+        }
+      </div>
+
+      @if (activeWorkspace()?.type === 'ORGANIZATION') {
+        <form class="settings-grid" (ngSubmit)="updateOrganization()">
+          <label>
+            <span>Organization name</span>
+            <input name="organizationName" [(ngModel)]="organizationName" [disabled]="!canManageOrganization()" />
+          </label>
+          <label>
+            <span>Join code</span>
+            <input name="activeJoinCode" [ngModel]="activeWorkspace()?.joinCode" disabled />
+          </label>
+          <button type="submit" [disabled]="loading() || !canManageOrganization()">
+            <mat-icon aria-hidden="true">save</mat-icon>
+            Save organization
+          </button>
+          <button type="button" class="secondary" (click)="regenerateCode()" [disabled]="loading() || !canManageOrganization()">
+            <mat-icon aria-hidden="true">sync</mat-icon>
+            Regenerate code
+          </button>
+        </form>
+
+        <div class="members-list">
+          <h3>Members</h3>
+          @for (member of organizationMembers(); track member.userId) {
+            <article class="member-row">
+              <div>
+                <strong>{{ memberName(member) }}</strong>
+                <span>{{ member.username }}</span>
+              </div>
+              <span class="member-role">{{ roleLabel(member.role) }}</span>
+            </article>
+          } @empty {
+            <p class="empty">No members found.</p>
+          }
+        </div>
+      } @else {
+        <form class="settings-grid" (ngSubmit)="createOrganization()">
+          <label>
+            <span>New organization name</span>
+            <input name="newOrganizationName" [(ngModel)]="organizationName" maxlength="160" />
+          </label>
+          <button type="submit" [disabled]="loading()">
+            <mat-icon aria-hidden="true">add_business</mat-icon>
+            Create organization
+          </button>
+        </form>
+      }
+
+      <form class="settings-grid" (ngSubmit)="joinOrganization()">
+        <label>
+          <span>Join by code</span>
+          <input name="joinCode" [(ngModel)]="joinCode" maxlength="24" />
+        </label>
+        <button type="submit" [disabled]="loading()">
+          <mat-icon aria-hidden="true">login</mat-icon>
+          Join organization
+        </button>
+      </form>
+    </section>
+  }
+</section>

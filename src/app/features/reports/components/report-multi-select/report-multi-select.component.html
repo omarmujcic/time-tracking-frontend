@@ -6,6 +6,32 @@
   </button>
   @if (open()) {
     <div class="options-panel">
+      @if (createLabel) {
+        @if (creating()) {
+          <div class="create-option-row">
+            <input
+              name="createOption"
+              [(ngModel)]="createValue"
+              [placeholder]="createPlaceholder"
+              maxlength="160"
+              (click)="$event.stopPropagation()"
+              (keydown.enter)="submitCreate(); $event.preventDefault()"
+              (keydown.escape)="cancelCreating(); $event.preventDefault()"
+            />
+            <button type="button" (click)="submitCreate()">
+              <mat-icon aria-hidden="true">check</mat-icon>
+            </button>
+            <button type="button" class="secondary" (click)="cancelCreating()">
+              <mat-icon aria-hidden="true">close</mat-icon>
+            </button>
+          </div>
+        } @else {
+          <button type="button" class="option-row create-option" (click)="startCreating($event)">
+            <mat-icon aria-hidden="true">add</mat-icon>
+            <span>{{ createLabel }}</span>
+          </button>
+        }
+      }
       @for (option of sortedOptions; track option.value) {
         <button
           type="button"

@@ -32,3 +32,23 @@ p {
   margin: 0;
   color: colors.$color-muted;
 }
+
+:host-context([data-theme='dark']) {
+  .placeholder-page {
+    background: #181b19;
+    color: #e3dfd7;
+  }
+
+  div {
+    border-color: #3a403d;
+    background: #1d211f;
+  }
+
+  h1 {
+    color: #e3dfd7;
+  }
+
+  p {
+    color: #aaa49a;
+  }
+}

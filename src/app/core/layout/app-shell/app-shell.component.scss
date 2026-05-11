@@ -80,6 +80,7 @@ nav {
 }
 
 .account {
+  position: relative;
   margin-top: auto;
   display: flex;
   align-items: center;
@@ -89,22 +90,41 @@ nav {
   border-top: 1px solid colors.$color-divider;
 }
 
+.account-trigger {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .account span,
-.account small {
+.account small,
+.account-trigger span,
+.account-trigger small {
   display: block;
 }
 
-.account span {
+.account span,
+.account-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 800;
 }
 
-.account small {
+.account small,
+.account-trigger small {
   margin-top: 2px;
   color: colors.$color-muted;
   font-size: 0.8rem;
 }
 
-.account button {
+.account > button:not(.account-trigger) {
   width: 36px;
   height: 36px;
   display: grid;
@@ -114,6 +134,113 @@ nav {
   background: colors.$color-surface;
   color: colors.$color-icon;
   cursor: pointer;
+}
+
+.account-menu {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% + 10px);
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid colors.$color-border;
+  border-radius: 8px;
+  background: colors.$color-surface;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  z-index: 10;
+
+  button {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: colors.$color-text;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+
+    &.active,
+    &:hover {
+      background: colors.$color-accent-soft;
+      color: colors.$color-accent;
+    }
+  }
+
+  mat-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+    color: colors.$color-accent;
+  }
+}
+
+:host-context([data-theme='dark']) {
+  .app-shell {
+    background: #181b19;
+    color: #e3dfd7;
+  }
+
+  .sidebar {
+    border-right-color: #343a37;
+    background: #191d1b;
+  }
+
+  .brand {
+    color: #e3dfd7;
+  }
+
+  .brand-mark {
+    color: #f5f1ea;
+  }
+
+  .nav-item {
+    color: #aaa49a;
+  }
+
+  .nav-item.active {
+    background: #23352f;
+    color: #9ed7c6;
+  }
+
+  .account {
+    border-top-color: #343a37;
+  }
+
+  .account small,
+  .account-trigger small {
+    color: #aaa49a;
+  }
+
+  .account > button:not(.account-trigger) {
+    border-color: #3a403d;
+    background: #1f2421;
+    color: #d7d2c9;
+  }
+
+  .account-menu {
+    border-color: #3a403d;
+    background: #171a18;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+
+    button {
+      color: #d7d2c9;
+
+      &.active,
+      &:hover {
+        background: #23352f;
+        color: #e6f2ee;
+      }
+    }
+
+    mat-icon {
+      color: #70aa99;
+    }
+  }
 }
 
 .content {

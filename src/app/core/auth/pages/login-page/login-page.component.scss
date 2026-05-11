@@ -111,3 +111,48 @@ input:focus {
   cursor: not-allowed;
   opacity: 0.65;
 }
+
+:host-context([data-theme='dark']) {
+  .auth-page {
+    background: #181b19;
+    color: #e3dfd7;
+  }
+
+  .auth-panel {
+    border-color: #3a403d;
+    background: #1d211f;
+    box-shadow: none;
+  }
+
+  .auth-heading p,
+  .mode-switch button,
+  label span {
+    color: #aaa49a;
+  }
+
+  .mode-switch {
+    background: #151817;
+  }
+
+  .mode-switch .active {
+    background: #23352f;
+    color: #e3dfd7;
+    box-shadow: none;
+  }
+
+  input {
+    border-color: #3a403d;
+    background: #151817;
+    color: #e3dfd7;
+  }
+
+  input:focus {
+    border-color: #70aa99;
+    box-shadow: 0 0 0 3px rgba(112, 170, 153, 0.18);
+  }
+
+  .submit {
+    background: #1f7d68;
+    color: #f5f1ea;
+  }
+}

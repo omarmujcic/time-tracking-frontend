@@ -37,6 +37,10 @@ export class AuthStateFacade {
     localStorage.setItem(userKey, JSON.stringify(this.userState()));
   }
 
+  updateSession(response: AuthResponse): void {
+    this.setSession(response);
+  }
+
   logout(): void {
     this.tokenState.set(null);
     this.userState.set(null);

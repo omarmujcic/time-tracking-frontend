@@ -41,8 +41,8 @@ export const routes: Routes = [
       },
       {
         path: 'settings',
-        component: PlaceholderPageComponent,
-        data: { titleKey: 'app.nav.settings', icon: 'settings' }
+        loadComponent: () =>
+          import('./features/settings/pages/settings-page/settings-page.component').then((m) => m.SettingsPageComponent)
       },
       {
         path: '',

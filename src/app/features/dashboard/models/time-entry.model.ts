@@ -3,8 +3,10 @@ export interface TimeEntry {
   userId: string;
   username: string;
   displayName: string;
+  projectId: string | null;
   projectName: string;
-  description: string | null;
+  taskId: string | null;
+  taskName: string | null;
   hourlyRate: number;
   currency: 'EUR';
   startedAt: string;
@@ -23,17 +25,24 @@ export interface TimeEntrySummary {
 }
 
 export interface StartTimerRequest {
-  projectName: string;
-  description?: string | null;
-  hourlyRate: number;
+  projectId?: string | null;
+  taskId?: string | null;
+  projectName?: string | null;
+  hourlyRate?: number | null;
 }
 
 export interface CreateTimeEntryRequest extends StartTimerRequest {
+  projectId: string;
+  projectName: string;
+  hourlyRate: number;
   startedAt: string;
   endedAt: string;
 }
 
 export interface UpdateTimeEntryRequest extends StartTimerRequest {
+  projectId: string;
+  projectName: string;
+  hourlyRate: number;
   startedAt: string;
   endedAt: string | null;
 }
@@ -43,4 +52,6 @@ export interface TimeEntryFilters {
   day?: string;
   project?: string;
   userId?: string;
+  projectNames?: string[];
+  userIds?: string[];
 }
