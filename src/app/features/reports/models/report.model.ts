@@ -9,7 +9,6 @@ export interface ReportFilters {
   projectNames: string[];
   minRate: number | null;
   maxRate: number | null;
-  description: string;
 }
 
 export interface ReportSummary {
@@ -42,7 +41,8 @@ export interface ReportEntry {
   username: string;
   displayName: string;
   projectName: string;
-  description: string | null;
+  taskId: string | null;
+  taskName: string | null;
   hourlyRate: number;
   currency: 'EUR';
   startedAt: string;

@@ -1,6 +1,7 @@
 export interface TimerForm {
+  projectId: string;
+  taskId: string;
   projectName: string;
-  description: string;
   hourlyRate: number | null;
 }
 
@@ -12,6 +13,6 @@ export interface ManualForm extends TimerForm {
 export interface FiltersForm {
   month: string;
   day: string;
-  project: string;
-  userId: string;
+  projectNames: string[];
+  userIds: string[];
 }

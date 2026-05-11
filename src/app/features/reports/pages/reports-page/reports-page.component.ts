@@ -1,11 +1,21 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, computed, signal } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { DatePickerComponent } from '../../../../shared/ui/date-picker/date-picker.component';
-import { ReportMultiSelectComponent, ReportMultiSelectOption } from '../../components/report-multi-select/report-multi-select.component';
+import {
+  formatUserCurrency,
+  formatUserDate,
+  formatUserDateTime,
+  formatUserRateInput,
+  parseUserDecimal
+} from '../../../../shared/utils/user-formatting';
+import { PreferenceService } from '../../../settings/services/preference.service';
+import { UserPreference } from '../../../settings/models/settings.model';
+import { WorkspaceStateFacade } from '../../../../shared/state/workspace/workspace-state.facade';
+import { ReportMultiSelectComponent } from '../../components/report-multi-select/report-multi-select.component';
+import { ReportMultiSelectOption } from '../../components/report-multi-select/report-multi-select.model';
 import {
   ProjectEntryGroup,
   ReportEntry,
@@ -20,9 +30,18 @@ import { ReportService } from '../../services/report.service';
 
 Chart.register(...registerables);
 
+const defaultPreference: UserPreference = {
+  language: 'en',
+  themeMode: 'SYSTEM',
+  groupedEntriesEnabled: true,
+  dateFormat: 'YYYY-MM-DD',
+  decimalSeparator: 'DOT',
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+};
+
 @Component({
   selector: 'app-reports-page',
-  imports: [CurrencyPipe, DatePipe, FormsModule, MatIconModule, DatePickerComponent, ReportMultiSelectComponent, TranslatePipe],
+  imports: [FormsModule, MatIconModule, DatePickerComponent, ReportMultiSelectComponent, TranslatePipe],
   templateUrl: './reports-page.component.html',
   styleUrl: './reports-page.component.scss'
 })
@@ -34,6 +53,8 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
   protected readonly report = signal<TimeReport | null>(null);
+  protected readonly groupedEntriesEnabled = signal(true);
+  protected readonly preferences = signal<UserPreference>({ ...defaultPreference });
   protected readonly options = signal<ReportFilterOptions>({ users: [], projects: [], rates: [] });
   protected readonly expandedProjects = signal<Set<string>>(new Set());
   protected readonly viewOptions: ReportView[] = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'CUSTOM'];
@@ -56,13 +77,26 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
   private chartsReady = false;
   private timeChart?: Chart;
   private projectChart?: Chart;
+  private currentWorkspaceKey = '';
 
   constructor(
     private readonly reportService: ReportService,
     private readonly reportPdfService: ReportPdfService,
+    private readonly preferenceService: PreferenceService,
+    private readonly workspaceState: WorkspaceStateFacade,
     private readonly translateService: TranslateService
   ) {
     this.loadReports();
+    effect(() => {
+      const workspaceKey = this.workspaceState.activeWorkspaceKey();
+      if (!workspaceKey || workspaceKey === this.currentWorkspaceKey) {
+        return;
+      }
+      this.currentWorkspaceKey = workspaceKey;
+      this.filters.userIds = [];
+      this.filters.projectNames = [];
+      void this.loadReports();
+    });
   }
 
   ngAfterViewInit(): void {
@@ -79,13 +113,14 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
     this.loading.set(true);
     this.loadError.set(null);
     try {
-      const [options, report] = await Promise.all([
+      const [options, report, preferences] = await Promise.all([
         this.reportService.filterOptions(),
-        this.reportService.timeReport(this.filters)
+        this.reportService.timeReport(this.filters),
+        this.preferenceService.get().catch(() => null)
       ]);
       this.options.set(options);
       this.report.set(report);
-      this.expandedProjects.set(new Set());
+      this.applyEntryGroupingPreference(preferences, report);
       this.scheduleRenderCharts();
     } catch {
       this.loadError.set(this.translation('error.load'));
@@ -117,20 +152,45 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
     return `${hours}h ${minutes}m`;
   }
 
+  protected money(value: number): string {
+    return formatUserCurrency(value, this.preferences());
+  }
+
+  protected dateTime(value: string): string {
+    return formatUserDateTime(value, this.preferences());
+  }
+
+  protected date(value: string): string {
+    const [year, month, day] = value.split('-').map(Number);
+    return formatUserDate(new Date(year, month - 1, day), this.preferences().dateFormat);
+  }
+
+  protected rateInput(value: number | null): string {
+    return formatUserRateInput(value, this.preferences());
+  }
+
+  protected updateMinRate(value: string): void {
+    this.filters.minRate = parseUserDecimal(value, this.preferences().decimalSeparator);
+  }
+
+  protected updateMaxRate(value: string): void {
+    this.filters.maxRate = parseUserDecimal(value, this.preferences().decimalSeparator);
+  }
+
   protected exportCsv(): void {
     const report = this.report();
     if (!report) {
       return;
     }
-    const headers = ['Date', 'User', 'Project', 'Description', 'Rate EUR', 'Start', 'End', 'Duration seconds', 'Amount EUR', 'Active'];
+    const headers = ['Date', 'User', 'Project', 'Task', 'Rate EUR', 'Start', 'End', 'Duration seconds', 'Amount EUR', 'Active'];
     const rows = report.entries.map((entry) => [
       entry.groupLabel,
       entry.displayName || entry.username,
       entry.projectName,
-      entry.description ?? '',
+      entry.taskName ?? '',
       entry.hourlyRate,
-      new Date(entry.startedAt).toLocaleString(),
-      entry.endedAt ? new Date(entry.endedAt).toLocaleString() : this.translation('entry.running'),
+      this.dateTime(entry.startedAt),
+      entry.endedAt ? this.dateTime(entry.endedAt) : this.translation('entry.running'),
       entry.durationSeconds,
       entry.billableAmount,
       entry.active ? 'yes' : 'no'
@@ -151,7 +211,7 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
     if (!report) {
       return;
     }
-    this.reportPdfService.generate(report, this.filters);
+    this.reportPdfService.generate(report, this.filters, this.preferences());
   }
 
   protected toggleProject(projectName: string): void {
@@ -166,6 +226,16 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
 
   protected isProjectExpanded(projectName: string): boolean {
     return this.expandedProjects().has(projectName);
+  }
+
+  private applyEntryGroupingPreference(preferences: UserPreference | null, report: TimeReport): void {
+    const groupedEntriesEnabled = preferences?.groupedEntriesEnabled ?? true;
+    this.preferences.set(preferences ?? { ...defaultPreference });
+    this.groupedEntriesEnabled.set(groupedEntriesEnabled);
+    this.expandedProjects.set(groupedEntriesEnabled
+      ? new Set(this.entryGroupsByProject(report.entries).map((group) => group.projectName))
+      : new Set()
+    );
   }
 
   private renderCharts(): void {
@@ -301,7 +371,6 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
       projectNames: [],
       minRate: null,
       maxRate: null,
-      description: ''
     };
   }
 

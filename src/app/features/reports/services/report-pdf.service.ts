@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatUserCurrency, formatUserDate, formatUserDateTime } from '../../../shared/utils/user-formatting';
+import { UserPreference } from '../../settings/models/settings.model';
 import { ReportEntry, ReportEntryGroup, ReportFilters, TimeReport } from '../models/report.model';
 
 @Injectable({ providedIn: 'root' })
@@ -11,20 +13,20 @@ export class ReportPdfService {
   private readonly muted = '#647284';
   private readonly border = '#dce3eb';
 
-  generate(report: TimeReport, filters: ReportFilters): void {
+  generate(report: TimeReport, filters: ReportFilters, preferences: UserPreference): void {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     let y = this.margin;
 
-    y = this.drawHeader(doc, filters, y);
-    y = this.drawSummary(doc, report, y + 8);
+    y = this.drawHeader(doc, filters, preferences, y);
+    y = this.drawSummary(doc, report, preferences, y + 8);
     y = this.drawTimeChart(doc, report, y + 10);
-    y = this.drawProjectBreakdown(doc, report, y + 10);
-    this.drawEntries(doc, this.groupEntriesByDate(report.entries), y + 10);
+    y = this.drawProjectBreakdown(doc, report, preferences, y + 10);
+    this.drawEntries(doc, this.groupEntriesByDate(report.entries), preferences, y + 10);
 
     doc.save(`time-report-${filters.startDate}-${filters.endDate}.pdf`);
   }
 
-  private drawHeader(doc: jsPDF, filters: ReportFilters, y: number): number {
+  private drawHeader(doc: jsPDF, filters: ReportFilters, preferences: UserPreference, y: number): number {
     doc.setTextColor(this.muted);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
@@ -37,15 +39,15 @@ export class ReportPdfService {
     doc.setTextColor(this.muted);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Report range ${filters.startDate} - ${filters.endDate}`, this.margin, y + 17);
-    doc.text(`Generated ${new Date().toLocaleString()}`, this.margin, y + 23);
+    doc.text(`Report range ${this.date(filters.startDate, preferences)} - ${this.date(filters.endDate, preferences)}`, this.margin, y + 17);
+    doc.text(`Generated ${formatUserDateTime(new Date().toISOString(), preferences)}`, this.margin, y + 23);
     return y + 23;
   }
 
-  private drawSummary(doc: jsPDF, report: TimeReport, y: number): number {
+  private drawSummary(doc: jsPDF, report: TimeReport, preferences: UserPreference, y: number): number {
     const cards = [
       ['Completed time', this.durationLabel(report.summary.totalSeconds)],
-      ['Completed amount', this.eur(report.summary.totalAmount)],
+      ['Completed amount', formatUserCurrency(report.summary.totalAmount, preferences)],
       ['Active time', this.durationLabel(report.summary.activeSeconds)],
       ['Entries', String(report.summary.entryCount)]
     ];
@@ -106,7 +108,7 @@ export class ReportPdfService {
     return y + 78;
   }
 
-  private drawProjectBreakdown(doc: jsPDF, report: TimeReport, y: number): number {
+  private drawProjectBreakdown(doc: jsPDF, report: TimeReport, preferences: UserPreference, y: number): number {
     const height = Math.max(34, 18 + report.projects.length * 12);
     y = this.ensureSpace(doc, y, height);
     this.drawSectionCard(doc, 'Worked time by project', y, height);
@@ -120,7 +122,7 @@ export class ReportPdfService {
 
       doc.setTextColor(this.muted);
       doc.setFont('helvetica', 'normal');
-      doc.text(`${this.durationLabel(project.totalSeconds)} · ${this.eur(project.totalAmount)}`, this.margin + 8, rowY + 5);
+      doc.text(`${this.durationLabel(project.totalSeconds)} · ${formatUserCurrency(project.totalAmount, preferences)}`, this.margin + 8, rowY + 5);
 
       const barX = this.pageWidth(doc) - this.margin - 70;
       doc.setTextColor(this.muted);
@@ -134,7 +136,7 @@ export class ReportPdfService {
     return y + height;
   }
 
-  private drawEntries(doc: jsPDF, groups: ReportEntryGroup[], y: number): void {
+  private drawEntries(doc: jsPDF, groups: ReportEntryGroup[], preferences: UserPreference, y: number): void {
     y = this.ensureSpace(doc, y, 28);
     doc.setTextColor(this.text);
     doc.setFontSize(13);
@@ -153,14 +155,14 @@ export class ReportPdfService {
       autoTable(doc, {
         startY: y,
         margin: { left: this.margin, right: this.margin },
-        head: [['User', 'Project', 'Description', 'Rate', 'Time', 'Amount']],
+        head: [['User', 'Project', 'Task', 'Rate', 'Time', 'Amount']],
         body: group.entries.map((entry) => [
           entry.username,
           entry.projectName,
-          entry.description || 'No description',
-          `${this.eur(entry.hourlyRate)}/h`,
-          `${this.durationLabel(entry.durationSeconds)}\n${this.shortDate(entry.startedAt)} - ${entry.endedAt ? this.shortDate(entry.endedAt) : 'Running'}`,
-          this.eur(entry.billableAmount)
+          entry.taskName || 'No task',
+          `${formatUserCurrency(entry.hourlyRate, preferences)}/h`,
+          `${this.durationLabel(entry.durationSeconds)}\n${formatUserDateTime(entry.startedAt, preferences)} - ${entry.endedAt ? formatUserDateTime(entry.endedAt, preferences) : 'Running'}`,
+          formatUserCurrency(entry.billableAmount, preferences)
         ]),
         styles: {
           font: 'helvetica',
@@ -234,16 +236,8 @@ export class ReportPdfService {
     return `${hours}h ${minutes}m`;
   }
 
-  private eur(value: number): string {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' }).format(value);
-  }
-
-  private shortDate(value: string): string {
-    return new Date(value).toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  private date(value: string, preferences: UserPreference): string {
+    const [year, month, day] = value.split('-').map(Number);
+    return formatUserDate(new Date(year, month - 1, day), preferences.dateFormat);
   }
 }

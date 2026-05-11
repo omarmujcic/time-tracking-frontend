@@ -47,7 +47,13 @@ export class TimeEntryService {
   private params(filters: TimeEntryFilters): HttpParams {
     let params = new HttpParams();
     Object.entries(filters).forEach(([key, value]) => {
-      if (value) {
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (item) {
+            params = params.append(key, item);
+          }
+        });
+      } else if (value) {
         params = params.set(key, value);
       }
     });

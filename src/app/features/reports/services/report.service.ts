@@ -36,9 +36,6 @@ export class ReportService {
     if (filters.maxRate !== null) {
       params = params.set('maxRate', String(filters.maxRate));
     }
-    if (filters.description.trim()) {
-      params = params.set('description', filters.description.trim());
-    }
     return params;
   }
 }

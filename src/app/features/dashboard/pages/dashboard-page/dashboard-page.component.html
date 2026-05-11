@@ -11,7 +11,7 @@
       </div>
       <div>
         <span>{{ translationPath + 'summary.totalAmount' | translate }}</span>
-        <strong>{{ totalAmount() | currency:'EUR':'symbol':'1.2-2' }}</strong>
+        <strong>{{ money(totalAmount()) }}</strong>
       </div>
       <div>
         <span>{{ translationPath + 'summary.entries' | translate }}</span>
@@ -33,18 +33,38 @@
       @if (timerError(); as error) {
         <p class="alert">{{ error }}</p>
       }
+      @if (taskError(); as error) {
+        <p class="alert">{{ error }}</p>
+      }
       <div class="timer-fields">
-        <label>
-          <span>{{ translationPath + 'entry.project' | translate }}</span>
-          <input name="timerProject" [(ngModel)]="timerForm.projectName" maxlength="160" required />
-        </label>
+        <app-report-multi-select
+          [label]="translationPath + 'entry.project' | translate"
+          placeholder="Select project"
+          [options]="activeProjectOptions()"
+          [multiple]="false"
+          [selectedValues]="selectedValue(timerForm.projectId)"
+          (selectedValuesChange)="onProjectValuesSelected(timerForm, $event)"
+        />
+        <app-report-multi-select
+          [label]="translationPath + 'entry.task' | translate"
+          placeholder="No task"
+          [options]="taskOptionsFor(timerForm.projectId)"
+          [multiple]="false"
+          [selectedValues]="selectedValue(timerForm.taskId)"
+          [createLabel]="timerForm.projectId ? 'Add task' : ''"
+          createPlaceholder="Task name"
+          (selectedValuesChange)="onTaskValuesSelected(timerForm, $event)"
+          (createOption)="createTask('timer', $event)"
+        />
         <label>
           <span>{{ translationPath + 'entry.hourlyRateEur' | translate }}</span>
-          <input name="timerRate" type="number" min="0.01" step="0.01" [(ngModel)]="timerForm.hourlyRate" required />
-        </label>
-        <label>
-          <span>{{ translationPath + 'entry.description' | translate }}</span>
-          <input name="timerDescription" [(ngModel)]="timerForm.description" maxlength="500" />
+          <input
+            name="timerRate"
+            type="text"
+            inputmode="decimal"
+            [ngModel]="rateInput(timerForm.hourlyRate)"
+            (ngModelChange)="updateRate(timerForm, $event)"
+          />
         </label>
       </div>
       <button type="submit" [disabled]="loading() || !!activeEntry()">
@@ -61,19 +81,45 @@
       @if (manualEntryError(); as error) {
         <p class="alert">{{ error }}</p>
       }
+      @if (taskError(); as error) {
+        <p class="alert">{{ error }}</p>
+      }
       <div class="form-grid">
-        <label>
-          <span>{{ translationPath + 'entry.project' | translate }}</span>
-          <input name="manualProject" [(ngModel)]="manualForm.projectName" maxlength="160" required />
-        </label>
+        <app-report-multi-select
+          [label]="translationPath + 'entry.project' | translate"
+          placeholder="Select project"
+          [options]="activeProjectOptions()"
+          [multiple]="false"
+          [selectedValues]="selectedValue(manualForm.projectId)"
+          (selectedValuesChange)="onProjectValuesSelected(manualForm, $event)"
+        />
+        <app-report-multi-select
+          [label]="translationPath + 'entry.task' | translate"
+          placeholder="No task"
+          [options]="taskOptionsFor(manualForm.projectId)"
+          [multiple]="false"
+          [selectedValues]="selectedValue(manualForm.taskId)"
+          [createLabel]="manualForm.projectId ? 'Add task' : ''"
+          createPlaceholder="Task name"
+          (selectedValuesChange)="onTaskValuesSelected(manualForm, $event)"
+          (createOption)="createTask('manual', $event)"
+        />
         <label>
           <span>{{ translationPath + 'entry.hourlyRateEur' | translate }}</span>
-          <input name="manualRate" type="number" min="0.01" step="0.01" [(ngModel)]="manualForm.hourlyRate" required />
+          <input
+            name="manualRate"
+            type="text"
+            inputmode="decimal"
+            [ngModel]="rateInput(manualForm.hourlyRate)"
+            (ngModelChange)="updateRate(manualForm, $event)"
+            required
+          />
         </label>
         <label>
           <span>{{ translationPath + 'entry.start' | translate }}</span>
           <app-date-picker
             mode="datetime"
+            [dateFormat]="preferences().dateFormat"
             [placeholder]="translationPath + 'date.selectStart' | translate"
             [value]="manualForm.startedAt"
             (valueChange)="manualForm.startedAt = $event"
@@ -83,14 +129,11 @@
           <span>{{ translationPath + 'entry.end' | translate }}</span>
           <app-date-picker
             mode="datetime"
+            [dateFormat]="preferences().dateFormat"
             [placeholder]="translationPath + 'date.selectEnd' | translate"
             [value]="manualForm.endedAt"
             (valueChange)="manualForm.endedAt = $event"
           />
-        </label>
-        <label class="full-width">
-          <span>{{ translationPath + 'entry.description' | translate }}</span>
-          <input name="manualDescription" [(ngModel)]="manualForm.description" maxlength="500" />
         </label>
       </div>
       <button type="submit" [disabled]="loading()">
@@ -113,6 +156,7 @@
         <span>{{ translationPath + 'filters.month' | translate }}</span>
         <app-date-picker
           mode="month"
+          [dateFormat]="preferences().dateFormat"
           [placeholder]="translationPath + 'date.selectMonth' | translate"
           [value]="filters.month"
           (valueChange)="filters.month = $event"
@@ -122,23 +166,24 @@
         <span>{{ translationPath + 'filters.day' | translate }}</span>
         <app-date-picker
           mode="date"
+          [dateFormat]="preferences().dateFormat"
           [placeholder]="translationPath + 'date.selectDay' | translate"
           [value]="filters.day"
           (valueChange)="filters.day = $event"
         />
       </label>
-      <label>
-        <span>{{ translationPath + 'entry.project' | translate }}</span>
-        <input [(ngModel)]="filters.project" name="filterProject" />
-      </label>
-      <label>
-        <span>{{ translationPath + 'filters.user' | translate }}</span>
-        <select [(ngModel)]="filters.userId" name="filterUser">
-          @if (user(); as currentUser) {
-            <option [value]="currentUser.id">{{ currentUser.displayName || currentUser.username }}</option>
-          }
-        </select>
-      </label>
+      <app-report-multi-select
+        [label]="translationPath + 'entry.project' | translate"
+        placeholder="All projects"
+        [options]="filterProjectOptions()"
+        [(selectedValues)]="filters.projectNames"
+      />
+      <app-report-multi-select
+        [label]="translationPath + 'filters.user' | translate"
+        placeholder="All users"
+        [options]="userFilterOptions()"
+        [(selectedValues)]="filters.userIds"
+      />
       <button type="button" (click)="applyFilters()">
         <mat-icon aria-hidden="true">search</mat-icon>
         {{ translationPath + 'filters.apply' | translate }}
@@ -158,17 +203,59 @@
     @if (entriesError(); as error) {
       <p class="alert">{{ error }}</p>
     }
+    @if (taskError(); as error) {
+      <p class="alert">{{ error }}</p>
+    }
 
     <div class="entries-list">
-      @if (activeEntry(); as active) {
-        <ng-container [ngTemplateOutlet]="entryRow" [ngTemplateOutletContext]="{ entry: active }" />
-      }
-
-      @for (entry of completedEntries(); track entry.id) {
-        <ng-container [ngTemplateOutlet]="entryRow" [ngTemplateOutletContext]="{ entry }" />
-      } @empty {
-        @if (!activeEntry()) {
-          <p class="empty">{{ translationPath + 'entries.empty' | translate }}</p>
+      @if (groupedEntriesEnabled()) {
+        @for (dayGroup of dayEntryGroups(); track dayGroup.key) {
+          <article class="day-entry-group">
+            <button type="button" class="day-entry-summary" (click)="toggleDay(dayGroup.key)">
+              <mat-icon aria-hidden="true">{{ isDayExpanded(dayGroup.key) ? 'expand_less' : 'expand_more' }}</mat-icon>
+              <strong>{{ dayGroup.label }}</strong>
+              <span>{{ dayGroup.entries.length }} entries</span>
+              <span>{{ durationLabel(dayGroup.totalSeconds) }}</span>
+              <span>{{ money(dayGroup.totalAmount) }}</span>
+            </button>
+            @if (isDayExpanded(dayGroup.key)) {
+              <div class="day-entry-projects">
+                @for (projectGroup of dayGroup.projects; track projectGroup.key) {
+                  <article class="project-entry-group">
+                    <button type="button" class="project-entry-summary" (click)="toggleProject(dayGroup.key, projectGroup.projectName)">
+                      <mat-icon aria-hidden="true">{{ isProjectExpanded(dayGroup.key, projectGroup.projectName) ? 'expand_less' : 'expand_more' }}</mat-icon>
+                      <strong>{{ projectGroup.projectName }}</strong>
+                      <span>{{ projectGroup.entries.length }} entries</span>
+                      <span>{{ durationLabel(projectGroup.totalSeconds) }}</span>
+                      <span>{{ money(projectGroup.totalAmount) }}</span>
+                    </button>
+                    @if (isProjectExpanded(dayGroup.key, projectGroup.projectName)) {
+                      <div class="project-entry-items">
+                        @for (entry of projectGroup.entries; track entry.id) {
+                          <ng-container [ngTemplateOutlet]="entryRow" [ngTemplateOutletContext]="{ entry }" />
+                        }
+                      </div>
+                    }
+                  </article>
+                }
+              </div>
+            }
+          </article>
+        } @empty {
+          @if (!activeEntry()) {
+            <p class="empty">{{ translationPath + 'entries.empty' | translate }}</p>
+          }
+        }
+      } @else {
+        @if (activeEntry(); as active) {
+          <ng-container [ngTemplateOutlet]="entryRow" [ngTemplateOutletContext]="{ entry: active }" />
+        }
+        @for (entry of completedEntries(); track entry.id) {
+          <ng-container [ngTemplateOutlet]="entryRow" [ngTemplateOutletContext]="{ entry }" />
+        } @empty {
+          @if (!activeEntry()) {
+            <p class="empty">{{ translationPath + 'entries.empty' | translate }}</p>
+          }
         }
       }
     </div>
@@ -179,18 +266,40 @@
   <article class="entry-row" [class.active-entry]="entry.active">
     @if (editingEntryId() === entry.id) {
       <div class="edit-grid">
-        <label>
-          <span>{{ translationPath + 'entry.project' | translate }}</span>
-          <input [(ngModel)]="editForm.projectName" name="editProject{{ entry.id }}" />
-        </label>
+        <app-report-multi-select
+          [label]="translationPath + 'entry.project' | translate"
+          placeholder="Select project"
+          [options]="activeProjectOptions()"
+          [multiple]="false"
+          [selectedValues]="selectedValue(editForm.projectId)"
+          (selectedValuesChange)="onProjectValuesSelected(editForm, $event)"
+        />
+        <app-report-multi-select
+          [label]="translationPath + 'entry.task' | translate"
+          placeholder="No task"
+          [options]="taskOptionsFor(editForm.projectId)"
+          [multiple]="false"
+          [selectedValues]="selectedValue(editForm.taskId)"
+          [createLabel]="editForm.projectId ? 'Add task' : ''"
+          createPlaceholder="Task name"
+          (selectedValuesChange)="onTaskValuesSelected(editForm, $event)"
+          (createOption)="createTask('edit', $event)"
+        />
         <label>
           <span>{{ translationPath + 'entry.rateEur' | translate }}</span>
-          <input type="number" min="0.01" step="0.01" [(ngModel)]="editForm.hourlyRate" name="editRate{{ entry.id }}" />
+          <input
+            type="text"
+            inputmode="decimal"
+            [ngModel]="rateInput(editForm.hourlyRate)"
+            (ngModelChange)="updateRate(editForm, $event)"
+            name="editRate{{ entry.id }}"
+          />
         </label>
         <label>
           <span>{{ translationPath + 'entry.start' | translate }}</span>
           <app-date-picker
             mode="datetime"
+            [dateFormat]="preferences().dateFormat"
             [placeholder]="translationPath + 'date.selectStart' | translate"
             [value]="editForm.startedAt"
             (valueChange)="editForm.startedAt = $event"
@@ -200,15 +309,12 @@
           <span>{{ translationPath + 'entry.end' | translate }}</span>
           <app-date-picker
             mode="datetime"
+            [dateFormat]="preferences().dateFormat"
             [placeholder]="translationPath + 'entry.running' | translate"
             [value]="editForm.endedAt"
             [disabled]="entry.active"
             (valueChange)="editForm.endedAt = $event"
           />
-        </label>
-        <label class="wide">
-          <span>{{ translationPath + 'entry.description' | translate }}</span>
-          <input [(ngModel)]="editForm.description" name="editDescription{{ entry.id }}" />
         </label>
       </div>
       <div class="row-actions">
@@ -228,24 +334,26 @@
             <span>{{ translationPath + 'entry.project' | translate }}</span>
             <strong>{{ entry.projectName }}</strong>
           </div>
-          <div class="detail-line">
-            <span>{{ translationPath + 'entry.description' | translate }}</span>
-            <strong>{{ entry.description || (translationPath + 'entry.noDescription' | translate) }}</strong>
-          </div>
+          @if (entry.taskName) {
+            <div class="detail-line">
+              <span>{{ translationPath + 'entry.task' | translate }}</span>
+              <strong>{{ entry.taskName }}</strong>
+            </div>
+          }
         </div>
         <div class="entry-meta">
-          <span><strong>{{ translationPath + 'entry.started' | translate }}</strong> {{ entry.startedAt | date:'MMM d, HH:mm:ss' }}</span>
-          <span><strong>{{ translationPath + 'entry.stopped' | translate }}</strong> {{ entry.endedAt ? (entry.endedAt | date:'MMM d, HH:mm:ss') : (translationPath + 'entry.running' | translate) }}</span>
+          <span><strong>{{ translationPath + 'entry.started' | translate }}</strong> {{ dateTime(entry.startedAt) }}</span>
+          <span><strong>{{ translationPath + 'entry.stopped' | translate }}</strong> {{ entry.endedAt ? dateTime(entry.endedAt) : (translationPath + 'entry.running' | translate) }}</span>
         </div>
       </div>
       <div class="entry-numbers">
         <strong>{{ durationLabel(liveDuration(entry)) }}</strong>
-        <span>{{ amountFor(entry) | currency:'EUR':'symbol':'1.2-2' }}</span>
-        <small>{{ entry.hourlyRate | currency:'EUR':'symbol':'1.2-2' }}/h</small>
+        <span>{{ money(amountFor(entry)) }}</span>
+        <small>{{ money(entry.hourlyRate) }}/h</small>
       </div>
       <div class="row-actions">
         @if (entry.active) {
-          <button type="button" (click)="stopTimer(entry)">
+          <button type="button" (click)="stopTimer(entry)" [disabled]="!canStopEntry(entry)">
             <mat-icon aria-hidden="true">stop_circle</mat-icon>
             {{ translationPath + 'entry.stop' | translate }}
           </button>

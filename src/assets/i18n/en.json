@@ -65,6 +65,7 @@
       },
       "entry": {
         "project": "Project",
+        "task": "Task",
         "description": "Description",
         "noDescription": "No description",
         "hourlyRateEur": "Hourly rate EUR",
@@ -142,6 +143,8 @@
       "entry": {
         "user": "User",
         "project": "Project",
+        "task": "Task",
+        "noTask": "No task",
         "description": "Description",
         "noDescription": "No description",
         "rate": "Rate",

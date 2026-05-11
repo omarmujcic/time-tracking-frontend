@@ -81,6 +81,40 @@ button {
   font-size: 1.2rem;
 }
 
+:host-context([data-theme='dark']) {
+  .home-page {
+    background: #181b19;
+    color: #e3dfd7;
+  }
+
+  .home-panel {
+    border-color: #3a403d;
+    background: #1d211f;
+    box-shadow: none;
+  }
+
+  header p,
+  .status-grid span,
+  .message {
+    color: #aaa49a;
+  }
+
+  button {
+    border-color: #59645f;
+    background: #222823;
+    color: #d7d2c9;
+  }
+
+  .status-grid div {
+    border-color: #343a37;
+    background: #222823;
+  }
+
+  .status-grid strong {
+    color: #9ed7c6;
+  }
+}
+
 @media (max-width: 520px) {
   header,
   .status-grid {
