@@ -20,57 +20,78 @@
     </div>
   </header>
 
-  @if (loadError(); as error) {
-    <p class="alert page-alert">{{ error }}</p>
-  }
-
   <section class="tool-grid">
-    <form class="panel timer-panel" (ngSubmit)="startTimer()">
+    <form class="panel timer-panel" (ngSubmit)="submitTimerForm()">
       <div class="panel-title">
         <mat-icon aria-hidden="true">play_circle</mat-icon>
         <h2>{{ translationPath + 'timer.title' | translate }}</h2>
       </div>
-      @if (timerError(); as error) {
-        <p class="alert">{{ error }}</p>
+      @if (activeTimer.activeEntry(); as runningEntry) {
+        <div class="running-timer-card">
+          <div class="running-timer-copy">
+            <span>{{ translationPath + 'timer.running' | translate }}</span>
+            <small>{{ activeTimer.contextLabel() }}</small>
+            <small>{{ translationPath + 'entry.started' | translate }} {{ dateTime(runningEntry.startedAt) }}</small>
+          </div>
+          <strong>{{ activeTimer.durationLabel() }}</strong>
+          <div class="running-timer-actions">
+            @if (showTimerDetailsEditor()) {
+              <button type="button" class="secondary" (click)="saveActiveTimerDetails(runningEntry)" [disabled]="loading()">
+                <mat-icon aria-hidden="true">check</mat-icon>
+                Save
+              </button>
+            } @else {
+              <button type="button" class="secondary" (click)="openTimerDetailsEditor()">
+                <mat-icon aria-hidden="true">edit</mat-icon>
+                Edit
+              </button>
+            }
+            <button type="button" (click)="stopTimerFromForm(runningEntry)" [disabled]="loading()">
+              <mat-icon aria-hidden="true">stop_circle</mat-icon>
+              {{ translationPath + 'entry.stop' | translate }}
+            </button>
+          </div>
+        </div>
       }
-      @if (taskError(); as error) {
-        <p class="alert">{{ error }}</p>
-      }
-      <div class="timer-fields">
-        <app-report-multi-select
-          [label]="translationPath + 'entry.project' | translate"
-          placeholder="Select project"
-          [options]="activeProjectOptions()"
-          [multiple]="false"
-          [selectedValues]="selectedValue(timerForm.projectId)"
-          (selectedValuesChange)="onProjectValuesSelected(timerForm, $event)"
-        />
-        <app-report-multi-select
-          [label]="translationPath + 'entry.task' | translate"
-          placeholder="No task"
-          [options]="taskOptionsFor(timerForm.projectId)"
-          [multiple]="false"
-          [selectedValues]="selectedValue(timerForm.taskId)"
-          [createLabel]="timerForm.projectId ? 'Add task' : ''"
-          createPlaceholder="Task name"
-          (selectedValuesChange)="onTaskValuesSelected(timerForm, $event)"
-          (createOption)="createTask('timer', $event)"
-        />
-        <label>
-          <span>{{ translationPath + 'entry.hourlyRateEur' | translate }}</span>
-          <input
-            name="timerRate"
-            type="text"
-            inputmode="decimal"
-            [ngModel]="rateInput(timerForm.hourlyRate)"
-            (ngModelChange)="updateRate(timerForm, $event)"
+      @if (showTimerDetailsEditor()) {
+        <div class="timer-fields">
+          <app-report-multi-select
+            [label]="translationPath + 'entry.project' | translate"
+            placeholder="Select project"
+            [options]="activeProjectOptions()"
+            [multiple]="false"
+            [selectedValues]="selectedValue(timerForm.projectId)"
+            (selectedValuesChange)="onProjectValuesSelected(timerForm, $event)"
           />
-        </label>
-      </div>
-      <button type="submit" [disabled]="loading() || !!activeEntry()">
-        <mat-icon aria-hidden="true">timer</mat-icon>
-        {{ translationPath + 'timer.start' | translate }}
-      </button>
+          <app-report-multi-select
+            [label]="translationPath + 'entry.task' | translate"
+            placeholder="No task"
+            [options]="taskOptionsFor(timerForm.projectId)"
+            [multiple]="false"
+            [selectedValues]="selectedValue(timerForm.taskId)"
+            [createLabel]="timerForm.projectId ? 'Add task' : ''"
+            createPlaceholder="Task name"
+            (selectedValuesChange)="onTaskValuesSelected(timerForm, $event)"
+            (createOption)="createTask('timer', $event)"
+          />
+          <label>
+            <span>{{ translationPath + 'entry.hourlyRateEur' | translate }}</span>
+            <input
+              name="timerRate"
+              type="text"
+              inputmode="decimal"
+              [ngModel]="rateInput(timerForm.hourlyRate)"
+              (ngModelChange)="updateRate(timerForm, $event)"
+            />
+          </label>
+        </div>
+      }
+      @if (!activeTimer.activeEntry()) {
+        <button type="submit" [disabled]="loading()">
+          <mat-icon aria-hidden="true">timer</mat-icon>
+          {{ translationPath + 'timer.start' | translate }}
+        </button>
+      }
     </form>
 
     <form class="panel manual-entry-panel" (ngSubmit)="createManualEntry()">
@@ -78,12 +99,6 @@
         <mat-icon aria-hidden="true">edit_calendar</mat-icon>
         <h2>{{ translationPath + 'manual.title' | translate }}</h2>
       </div>
-      @if (manualEntryError(); as error) {
-        <p class="alert">{{ error }}</p>
-      }
-      @if (taskError(); as error) {
-        <p class="alert">{{ error }}</p>
-      }
       <div class="form-grid">
         <app-report-multi-select
           [label]="translationPath + 'entry.project' | translate"
@@ -148,9 +163,6 @@
       <mat-icon aria-hidden="true">filter_alt</mat-icon>
       <h2>{{ translationPath + 'filters.title' | translate }}</h2>
     </div>
-    @if (filtersError(); as error) {
-      <p class="alert">{{ error }}</p>
-    }
     <div class="filters-grid">
       <label>
         <span>{{ translationPath + 'filters.month' | translate }}</span>
@@ -200,12 +212,6 @@
       <mat-icon aria-hidden="true">list_alt</mat-icon>
       <h2>{{ translationPath + 'entries.title' | translate }}</h2>
     </div>
-    @if (entriesError(); as error) {
-      <p class="alert">{{ error }}</p>
-    }
-    @if (taskError(); as error) {
-      <p class="alert">{{ error }}</p>
-    }
 
     <div class="entries-list">
       @if (groupedEntriesEnabled()) {
@@ -318,13 +324,23 @@
         </label>
       </div>
       <div class="row-actions">
-        <button type="button" (click)="saveEdit(entry)">
+        <button
+          type="button"
+          class="icon-button"
+          [attr.aria-label]="translationPath + 'entry.save' | translate"
+          [title]="translationPath + 'entry.save' | translate"
+          (click)="saveEdit(entry)"
+        >
           <mat-icon aria-hidden="true">check</mat-icon>
-          {{ translationPath + 'entry.save' | translate }}
         </button>
-        <button type="button" class="secondary" (click)="cancelEdit()">
+        <button
+          type="button"
+          class="icon-button secondary"
+          [attr.aria-label]="translationPath + 'entry.cancel' | translate"
+          [title]="translationPath + 'entry.cancel' | translate"
+          (click)="cancelEdit()"
+        >
           <mat-icon aria-hidden="true">close</mat-icon>
-          {{ translationPath + 'entry.cancel' | translate }}
         </button>
       </div>
     } @else {
@@ -353,18 +369,45 @@
       </div>
       <div class="row-actions">
         @if (entry.active) {
-          <button type="button" (click)="stopTimer(entry)" [disabled]="!canStopEntry(entry)">
+          <button
+            type="button"
+            class="icon-button"
+            [attr.aria-label]="translationPath + 'entry.stop' | translate"
+            [title]="translationPath + 'entry.stop' | translate"
+            (click)="stopTimer(entry)"
+            [disabled]="!canStopEntry(entry)"
+          >
             <mat-icon aria-hidden="true">stop_circle</mat-icon>
-            {{ translationPath + 'entry.stop' | translate }}
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="icon-button"
+            [attr.aria-label]="translationPath + 'entry.continue' | translate"
+            [title]="translationPath + 'entry.continue' | translate"
+            (click)="continueEntry(entry)"
+            [disabled]="loading()"
+          >
+            <mat-icon aria-hidden="true">play_arrow</mat-icon>
           </button>
         }
-        <button type="button" class="secondary" (click)="startEdit(entry)">
+        <button
+          type="button"
+          class="icon-button secondary"
+          [attr.aria-label]="translationPath + 'entry.edit' | translate"
+          [title]="translationPath + 'entry.edit' | translate"
+          (click)="startEdit(entry)"
+        >
           <mat-icon aria-hidden="true">edit</mat-icon>
-          {{ translationPath + 'entry.edit' | translate }}
         </button>
-        <button type="button" class="danger" (click)="deleteEntry(entry)">
+        <button
+          type="button"
+          class="icon-button danger"
+          [attr.aria-label]="translationPath + 'entry.delete' | translate"
+          [title]="translationPath + 'entry.delete' | translate"
+          (click)="deleteEntry(entry)"
+        >
           <mat-icon aria-hidden="true">delete</mat-icon>
-          {{ translationPath + 'entry.delete' | translate }}
         </button>
       </div>
     }

@@ -15,13 +15,6 @@
     </label>
   </header>
 
-  @if (message(); as text) {
-    <p class="notice success">{{ text }}</p>
-  }
-  @if (error(); as text) {
-    <p class="notice error">{{ text }}</p>
-  }
-
   @if (search().trim()) {
     <div class="search-summary">
       @if (searchMatches().length) {

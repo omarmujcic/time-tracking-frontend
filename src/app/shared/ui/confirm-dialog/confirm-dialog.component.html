@@ -1,0 +1,29 @@
+@if (request(); as dialog) {
+  <div class="confirm-backdrop" (click)="cancel()">
+    <section
+      class="confirm-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-dialog-title"
+      aria-describedby="confirm-dialog-message"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="confirm-icon" [class.danger]="dialog.variant === 'danger'">
+        <mat-icon aria-hidden="true">{{ dialog.icon }}</mat-icon>
+      </div>
+      <div class="confirm-copy">
+        <h2 id="confirm-dialog-title">{{ dialog.title }}</h2>
+        <p id="confirm-dialog-message">{{ dialog.message }}</p>
+      </div>
+      <div class="confirm-actions">
+        <button type="button" class="secondary" (click)="cancel()">
+          {{ dialog.cancelText }}
+        </button>
+        <button type="button" [class.danger]="dialog.variant === 'danger'" (click)="confirm()">
+          <mat-icon aria-hidden="true">{{ dialog.icon }}</mat-icon>
+          {{ dialog.confirmText }}
+        </button>
+      </div>
+    </section>
+  </div>
+}

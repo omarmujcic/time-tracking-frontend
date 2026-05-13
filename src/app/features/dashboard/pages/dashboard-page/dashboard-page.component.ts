@@ -1,11 +1,16 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, OnDestroy, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AuthStateFacade } from '../../../../shared/state/auth/auth-state.facade';
+import { ActiveTimerFacade } from '../../../../shared/state/timer/active-timer.facade';
 import { WorkspaceStateFacade } from '../../../../shared/state/workspace/workspace-state.facade';
+import { ConfirmationDialogService } from '../../../../shared/ui/confirm-dialog/confirm-dialog.service';
 import { DatePickerComponent } from '../../../../shared/ui/date-picker/date-picker.component';
+import { NotificationToastService } from '../../../../shared/ui/notification-toast/notification-toast.service';
+import { httpErrorMessage } from '../../../../shared/utils/http-error-message';
 import {
   formatUserCurrency,
   formatUserDate,
@@ -14,7 +19,7 @@ import {
   parseUserDecimal
 } from '../../../../shared/utils/user-formatting';
 import { PreferenceService } from '../../../settings/services/preference.service';
-import { OrganizationMember, UserPreference } from '../../../settings/models/settings.model';
+import { OrganizationMember, ProjectTask, UserPreference } from '../../../settings/models/settings.model';
 import { ProjectService } from '../../../settings/services/project.service';
 import { WorkspaceService } from '../../../settings/services/workspace.service';
 import { ReportMultiSelectComponent } from '../../../reports/components/report-multi-select/report-multi-select.component';
@@ -47,7 +52,14 @@ const defaultPreference: UserPreference = {
 
 @Component({
   selector: 'app-dashboard-page',
-  imports: [FormsModule, MatIconModule, NgTemplateOutlet, DatePickerComponent, ReportMultiSelectComponent, TranslatePipe],
+  imports: [
+    FormsModule,
+    MatIconModule,
+    NgTemplateOutlet,
+    DatePickerComponent,
+    ReportMultiSelectComponent,
+    TranslatePipe
+  ],
   templateUrl: './dashboard-page.component.html',
   styleUrl: './dashboard-page.component.scss'
 })
@@ -61,6 +73,7 @@ export class DashboardPageComponent implements OnDestroy {
   protected readonly filtersError = signal<string | null>(null);
   protected readonly entriesError = signal<string | null>(null);
   protected readonly taskError = signal<string | null>(null);
+  protected readonly timerDetailsEditorOpen = signal(false);
   protected readonly currentTime = signal(new Date());
   protected readonly groupedEntriesEnabled = signal(true);
   protected readonly expandedDays = signal<Set<string>>(new Set());
@@ -108,6 +121,13 @@ export class DashboardPageComponent implements OnDestroy {
       ? [{ value: currentUser.id, label: currentUser.displayName || currentUser.username }]
       : [];
   });
+  protected readonly activeTimerNeedsDetails = computed(() => {
+    const entry = this.activeTimer.activeEntry();
+    return Boolean(entry && (!entry.projectId || Number(entry.hourlyRate) <= 0));
+  });
+  protected readonly showTimerDetailsEditor = computed(() =>
+    !this.activeTimer.activeEntry() || this.timerDetailsEditorOpen() || this.activeTimerNeedsDetails()
+  );
 
   private readonly timer = window.setInterval(() => this.currentTime.set(new Date()), 1000);
   private currentWorkspaceKey = '';
@@ -119,6 +139,10 @@ export class DashboardPageComponent implements OnDestroy {
     private readonly projectService: ProjectService,
     private readonly timeEntryService: TimeEntryService,
     private readonly preferenceService: PreferenceService,
+    protected readonly activeTimer: ActiveTimerFacade,
+    private readonly confirmationDialog: ConfirmationDialogService,
+    private readonly notifications: NotificationToastService,
+    private readonly route: ActivatedRoute,
     private readonly translateService: TranslateService
   ) {
     this.user = this.authState.user;
@@ -129,6 +153,7 @@ export class DashboardPageComponent implements OnDestroy {
       projectNames: [],
       userIds: []
     };
+    this.timerDetailsEditorOpen.set(this.route.snapshot.queryParamMap.get('editTimer') === 'true');
     this.loadDashboard();
     this.workspaceState.load();
     this.preferenceService.get()
@@ -159,17 +184,34 @@ export class DashboardPageComponent implements OnDestroy {
     this.loadError.set(null);
     try {
       const filters = this.requestFilters();
-      const [entries] = await Promise.all([
+      const [entries, , activeEntry] = await Promise.all([
         this.timeEntryService.list(filters),
-        this.loadOrganizationMembers()
+        this.loadOrganizationMembers(),
+        this.activeTimer.loadActive()
       ]);
       this.entries.set(entries);
+      this.syncTimerForm(activeEntry);
       this.expandEntryGroups();
-    } catch {
-      this.loadError.set(this.translation('error.load'));
+    } catch (error) {
+      const message = httpErrorMessage(error, this.translation('error.load'));
+      this.loadError.set(message);
+      this.notifications.error(message, 'Could not load dashboard');
     } finally {
       this.loading.set(false);
     }
+  }
+
+  protected async submitTimerForm(): Promise<void> {
+    const activeEntry = this.activeTimer.activeEntry();
+    if (activeEntry) {
+      if (this.showTimerDetailsEditor()) {
+        await this.saveActiveTimerDetails(activeEntry);
+      } else {
+        await this.stopTimerFromForm(activeEntry);
+      }
+      return;
+    }
+    await this.startTimer();
   }
 
   protected async startTimer(): Promise<void> {
@@ -183,15 +225,76 @@ export class DashboardPageComponent implements OnDestroy {
         hourlyRate: this.timerForm.hourlyRate
       });
       this.timerForm = { ...emptyTimerForm };
-    });
+    }, 'Timer started.');
+  }
+
+  protected async stopTimerFromForm(entry: TimeEntry): Promise<void> {
+    this.timerError.set(null);
+    if (!this.timerForm.projectId || !this.timerForm.hourlyRate) {
+      this.showFormError(this.timerError, this.translation('error.timerRequired'));
+      return;
+    }
+    const hourlyRate = this.timerForm.hourlyRate;
+    const stopped = await this.runAction(this.timerError, async () => {
+      await this.timeEntryService.update(entry.id, {
+        projectId: this.timerForm.projectId,
+        taskId: this.timerForm.taskId || null,
+        projectName: this.timerForm.projectName,
+        hourlyRate,
+        startedAt: entry.startedAt,
+        endedAt: null
+      });
+      await this.timeEntryService.stop(entry.id);
+      this.timerForm = { ...emptyTimerForm };
+    }, 'Timer stopped.');
+    if (stopped) {
+      this.timerDetailsEditorOpen.set(false);
+    }
+  }
+
+  protected openTimerDetailsEditor(): void {
+    this.timerDetailsEditorOpen.set(true);
+  }
+
+  protected async saveActiveTimerDetails(entry: TimeEntry): Promise<void> {
+    this.timerError.set(null);
+    if (!this.timerForm.projectId || !this.timerForm.hourlyRate) {
+      this.showFormError(this.timerError, this.translation('error.timerRequired'));
+      return;
+    }
+    const hourlyRate = this.timerForm.hourlyRate;
+    const saved = await this.runAction(this.timerError, async () => {
+      await this.timeEntryService.update(entry.id, {
+        projectId: this.timerForm.projectId,
+        taskId: this.timerForm.taskId || null,
+        projectName: this.timerForm.projectName,
+        hourlyRate,
+        startedAt: entry.startedAt,
+        endedAt: null
+      });
+    }, 'Timer details saved.');
+    if (saved) {
+      this.timerDetailsEditorOpen.set(false);
+    }
   }
 
   protected async stopTimer(entry: TimeEntry): Promise<void> {
     if (!this.canStopEntry(entry)) {
-      this.entriesError.set('Select a project and hourly rate before stopping the timer.');
+      this.showFormError(this.entriesError, 'Select a project and hourly rate before stopping the timer.');
       return;
     }
-    await this.runAction(this.entriesError, () => this.timeEntryService.stop(entry.id));
+    await this.runAction(this.entriesError, () => this.timeEntryService.stop(entry.id), 'Timer stopped.');
+  }
+
+  protected async continueEntry(entry: TimeEntry): Promise<void> {
+    await this.runAction(this.entriesError, async () => {
+      await this.timeEntryService.start({
+        projectId: entry.projectId,
+        taskId: entry.taskId,
+        projectName: entry.projectName,
+        hourlyRate: Number(entry.hourlyRate)
+      });
+    }, 'Timer continued.');
   }
 
   protected async createManualEntry(): Promise<void> {
@@ -204,7 +307,7 @@ export class DashboardPageComponent implements OnDestroy {
     await this.runAction(this.manualEntryError, async () => {
       await this.timeEntryService.create(request);
       this.manualForm = this.defaultManualForm();
-    });
+    }, 'Time entry added.');
   }
 
   protected startEdit(entry: TimeEntry): void {
@@ -234,14 +337,21 @@ export class DashboardPageComponent implements OnDestroy {
     await this.runAction(this.entriesError, async () => {
       await this.timeEntryService.update(entry.id, request);
       this.editingEntryId.set(null);
-    });
+    }, 'Time entry updated.');
   }
 
   protected async deleteEntry(entry: TimeEntry): Promise<void> {
-    if (!window.confirm(this.translation('entry.deleteConfirm', { projectName: entry.projectName }))) {
+    const confirmed = await this.confirmationDialog.confirm({
+      title: this.translation('entry.deleteTitle'),
+      message: this.translation('entry.deleteConfirm', { projectName: entry.projectName }),
+      confirmText: this.translation('entry.delete'),
+      icon: 'delete',
+      variant: 'danger'
+    });
+    if (!confirmed) {
       return;
     }
-    await this.runAction(this.entriesError, () => this.timeEntryService.delete(entry.id));
+    await this.runAction(this.entriesError, () => this.timeEntryService.delete(entry.id), 'Time entry deleted.');
   }
 
   protected applyFilters(): void {
@@ -267,6 +377,7 @@ export class DashboardPageComponent implements OnDestroy {
     if (project) {
       form.hourlyRate = Number(project.hourlyRate);
     }
+    this.syncActiveTimerDetails(form);
   }
 
   protected tasksFor(projectId: string) {
@@ -290,17 +401,18 @@ export class DashboardPageComponent implements OnDestroy {
 
   protected onTaskValuesSelected(form: TimerForm, values: string[]): void {
     form.taskId = values[0] ?? '';
+    this.syncActiveTimerDetails(form);
   }
 
   protected async createTask(target: 'timer' | 'manual' | 'edit', name: string): Promise<void> {
     this.taskError.set(null);
     const form = this.formForTarget(target);
     if (!form.projectId) {
-      this.taskError.set('Select a project before creating a task.');
+      this.showFormError(this.taskError, 'Select a project before creating a task.');
       return;
     }
     if (!name.trim()) {
-      this.taskError.set('Task name is required.');
+      this.showFormError(this.taskError, 'Task name is required.');
       return;
     }
 
@@ -312,8 +424,12 @@ export class DashboardPageComponent implements OnDestroy {
       });
       await this.workspaceState.refreshProjects();
       form.taskId = task.id;
-    } catch {
-      this.taskError.set('Unable to create task.');
+      this.syncActiveTimerDetails(form, task);
+      this.notifications.success('Task created.');
+    } catch (error) {
+      const message = httpErrorMessage(error, 'Unable to create task.');
+      this.taskError.set(message);
+      this.notifications.error(message);
     } finally {
       this.loading.set(false);
     }
@@ -379,20 +495,32 @@ export class DashboardPageComponent implements OnDestroy {
 
   protected updateRate(form: TimerForm, value: string): void {
     form.hourlyRate = parseUserDecimal(value, this.preferences().decimalSeparator);
+    this.syncActiveTimerDetails(form);
   }
 
   protected canStopEntry(entry: TimeEntry): boolean {
     return !!entry.projectId && Number(entry.hourlyRate) > 0;
   }
 
-  private async runAction(errorState: ReturnType<typeof signal<string | null>>, action: () => Promise<unknown>): Promise<void> {
+  private async runAction(
+    errorState: ReturnType<typeof signal<string | null>>,
+    action: () => Promise<unknown>,
+    successMessage?: string
+  ): Promise<boolean> {
     this.loading.set(true);
     errorState.set(null);
     try {
       await action();
       await this.loadDashboard();
-    } catch {
-      errorState.set(this.translation('error.actionFailed'));
+      if (successMessage) {
+        this.notifications.success(successMessage);
+      }
+      return true;
+    } catch (error) {
+      const message = httpErrorMessage(error, this.translation('error.actionFailed'));
+      errorState.set(message);
+      this.notifications.error(message);
+      return false;
     } finally {
       this.loading.set(false);
     }
@@ -400,7 +528,7 @@ export class DashboardPageComponent implements OnDestroy {
 
   private manualRequest(): CreateTimeEntryRequest | null {
     if (!this.manualForm.projectId || !this.manualForm.hourlyRate || !this.manualForm.startedAt || !this.manualForm.endedAt) {
-      this.manualEntryError.set(this.translation('error.manualRequired'));
+      this.showFormError(this.manualEntryError, this.translation('error.manualRequired'));
       return null;
     }
 
@@ -416,11 +544,11 @@ export class DashboardPageComponent implements OnDestroy {
 
   private updateRequest(isActive: boolean): UpdateTimeEntryRequest | null {
     if (!this.editForm.projectId || !this.editForm.hourlyRate || !this.editForm.startedAt) {
-      this.entriesError.set(this.translation('error.editRequired'));
+      this.showFormError(this.entriesError, this.translation('error.editRequired'));
       return null;
     }
     if (!isActive && !this.editForm.endedAt) {
-      this.entriesError.set(this.translation('error.editEndRequired'));
+      this.showFormError(this.entriesError, this.translation('error.editEndRequired'));
       return null;
     }
 
@@ -441,6 +569,11 @@ export class DashboardPageComponent implements OnDestroy {
       projectNames: this.filters.projectNames,
       userIds: this.filters.userIds
     };
+  }
+
+  private showFormError(errorState: ReturnType<typeof signal<string | null>>, message: string): void {
+    errorState.set(message);
+    this.notifications.error(message, 'Check required fields');
   }
 
   private entryGroupsByDay(entries: TimeEntry[]): DayEntryGroup[] {
@@ -511,6 +644,32 @@ export class DashboardPageComponent implements OnDestroy {
     this.editingEntryId.set(null);
     this.filters.projectNames = [];
     this.filters.userIds = [];
+  }
+
+  private syncTimerForm(entry: TimeEntry | null): void {
+    if (!entry) {
+      return;
+    }
+    this.timerForm = {
+      projectName: entry.projectName,
+      projectId: entry.projectId ?? '',
+      taskId: entry.taskId ?? '',
+      hourlyRate: Number(entry.hourlyRate)
+    };
+  }
+
+  private syncActiveTimerDetails(form: TimerForm, createdTask?: ProjectTask): void {
+    if (form !== this.timerForm || !this.activeTimer.activeEntry()) {
+      return;
+    }
+    const task = createdTask ?? this.tasksFor(form.projectId).find((option) => option.id === form.taskId);
+    this.activeTimer.updateActiveDetails({
+      projectId: form.projectId || null,
+      projectName: form.projectName,
+      taskId: form.taskId || null,
+      taskName: task?.name ?? null,
+      hourlyRate: form.hourlyRate ?? 0
+    });
   }
 
   private sortEntries(entries: TimeEntry[]): TimeEntry[] {

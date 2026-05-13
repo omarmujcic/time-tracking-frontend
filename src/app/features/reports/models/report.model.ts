@@ -7,6 +7,8 @@ export interface ReportFilters {
   timezone: string;
   userIds: string[];
   projectNames: string[];
+  taskIds: string[];
+  includeNoTask: boolean;
   minRate: number | null;
   maxRate: number | null;
 }
@@ -26,10 +28,27 @@ export interface ReportBucket {
   label: string;
   totalSeconds: number;
   totalAmount: number;
+  taskSegments: ReportBucketSegment[];
+}
+
+export interface ReportBucketSegment {
+  taskId: string | null;
+  taskName: string | null;
+  projectName: string | null;
+  totalSeconds: number;
+  totalAmount: number;
 }
 
 export interface ReportProject {
   projectName: string;
+  totalSeconds: number;
+  totalAmount: number;
+  percentage: number;
+}
+
+export interface ReportTaskBreakdown {
+  key: string;
+  label: string;
   totalSeconds: number;
   totalAmount: number;
   percentage: number;
@@ -70,7 +89,16 @@ export interface ReportUserOption {
 export interface ReportFilterOptions {
   users: ReportUserOption[];
   projects: string[];
+  tasks: ReportTaskOption[];
   rates: number[];
+  hasNoTask: boolean;
+}
+
+export interface ReportTaskOption {
+  id: string;
+  name: string;
+  projectId: string;
+  projectName: string;
 }
 
 export interface ReportEntryGroup {

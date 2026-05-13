@@ -45,6 +45,7 @@
       },
       "timer": {
         "title": "Start timer",
+        "running": "Running timer",
         "start": "Start"
       },
       "manual": {
@@ -78,8 +79,10 @@
         "save": "Save",
         "cancel": "Cancel",
         "stop": "Stop",
+        "continue": "Continue",
         "edit": "Edit",
         "delete": "Delete",
+        "deleteTitle": "Delete time entry",
         "deleteConfirm": "Delete time entry for {{ projectName }}?"
       },
       "date": {
@@ -121,6 +124,8 @@
         "allUsers": "All users",
         "projects": "Projects",
         "allProjects": "All projects",
+        "tasks": "Tasks",
+        "allTasks": "All tasks",
         "minRate": "Min rate EUR",
         "maxRate": "Max rate EUR",
         "description": "Description words",
@@ -130,6 +135,7 @@
       "charts": {
         "timeTitle": "Worked time by period",
         "projectTitle": "Worked time by project",
+        "taskTitle": "Worked time by task",
         "hours": "Hours"
       },
       "projects": {

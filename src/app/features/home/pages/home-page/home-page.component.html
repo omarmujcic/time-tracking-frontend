@@ -19,8 +19,8 @@
           <strong>{{ apiStatus.database }}</strong>
         </div>
       </div>
-    } @else {
-      <p class="message">{{ statusError() || (translationPath + 'checking' | translate) }}</p>
+    } @else if (checkingStatus()) {
+      <p class="message">{{ translationPath + 'checking' | translate }}</p>
     }
   </section>
 </main>

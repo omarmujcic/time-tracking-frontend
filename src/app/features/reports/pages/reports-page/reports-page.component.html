@@ -26,10 +26,6 @@
     }
   </header>
 
-  @if (loadError(); as error) {
-    <p class="alert page-alert">{{ error }}</p>
-  }
-
   <section class="panel filters-panel no-print">
     <div class="panel-heading">
       <div class="panel-title">
@@ -90,7 +86,15 @@
         [label]="translationPath + 'filters.projects' | translate"
         [placeholder]="translationPath + 'filters.allProjects' | translate"
         [options]="projectOptions()"
-        [(selectedValues)]="filters.projectNames"
+        [selectedValues]="filters.projectNames"
+        (selectedValuesChange)="updateProjectFilter($event)"
+      />
+      <app-report-multi-select
+        [label]="translationPath + 'filters.tasks' | translate"
+        [placeholder]="translationPath + 'filters.allTasks' | translate"
+        [options]="taskOptions()"
+        [selectedValues]="taskFilterValues()"
+        (selectedValuesChange)="updateTaskFilter($event)"
       />
       <label>
         <span>{{ translationPath + 'filters.minRate' | translate }}</span>
@@ -128,10 +132,10 @@
   @if (report(); as currentReport) {
     <section class="print-meta">
       <strong>{{ translationPath + 'print.range' | translate }}</strong>
-      {{ date(filters.startDate) }} - {{ date(filters.endDate) }}
+      {{ date(appliedFilters().startDate) }} - {{ date(appliedFilters().endDate) }}
     </section>
 
-    <section class="report-grid">
+    <section class="report-grid" [class.task-chart-mode]="taskChartMode()">
       <article class="panel time-chart-panel">
         <div class="panel-title">
           <mat-icon aria-hidden="true">bar_chart</mat-icon>
@@ -145,26 +149,59 @@
       <article class="panel project-chart-panel">
         <div class="panel-title">
           <mat-icon aria-hidden="true">donut_large</mat-icon>
-          <h2>{{ translationPath + 'charts.projectTitle' | translate }}</h2>
+          <h2>
+            {{
+              taskChartMode()
+                ? (translationPath + 'charts.taskTitle' | translate)
+                : (translationPath + 'charts.projectTitle' | translate)
+            }}
+          </h2>
         </div>
         <div class="project-content">
           <div class="donut-frame">
             <canvas #projectChartCanvas></canvas>
           </div>
           <div class="project-list">
-            @for (project of currentReport.projects; track project.projectName) {
-              <div class="project-row">
-                <div>
-                  <strong>{{ project.projectName }}</strong>
-                  <span>{{ durationLabel(project.totalSeconds) }} · {{ money(project.totalAmount) }}</span>
+            @if (taskChartMode()) {
+              @for (task of visibleTaskBreakdown(); track task.key; let index = $index) {
+                <div class="project-row">
+                  <div>
+                    <strong>{{ task.label }}</strong>
+                    <span>{{ durationLabel(task.totalSeconds) }} · {{ money(task.totalAmount) }}</span>
+                  </div>
+                  <div class="project-share">
+                    <span>{{ task.percentage }}%</span>
+                    <div><i [style.width.%]="task.percentage" [style.background]="taskBreakdownColor(task, index)"></i></div>
+                  </div>
                 </div>
-                <div class="project-share">
-                  <span>{{ project.percentage }}%</span>
-                  <div><i [style.width.%]="project.percentage"></i></div>
+              } @empty {
+                <p class="empty">{{ translationPath + 'projects.empty' | translate }}</p>
+              }
+              @if (taskBreakdown().length > 3) {
+                <div class="task-pager">
+                  <button type="button" class="secondary" [disabled]="taskBreakdownStart() === 0" aria-label="Previous task" (click)="moveTaskBreakdown(-1)">
+                    <mat-icon aria-hidden="true">keyboard_arrow_up</mat-icon>
+                  </button>
+                  <button type="button" class="secondary" [disabled]="taskBreakdownStart() >= maxTaskBreakdownStart()" aria-label="Next task" (click)="moveTaskBreakdown(1)">
+                    <mat-icon aria-hidden="true">keyboard_arrow_down</mat-icon>
+                  </button>
                 </div>
-              </div>
-            } @empty {
-              <p class="empty">{{ translationPath + 'projects.empty' | translate }}</p>
+              }
+            } @else {
+              @for (project of currentReport.projects; track project.projectName) {
+                <div class="project-row">
+                  <div>
+                    <strong>{{ project.projectName }}</strong>
+                    <span>{{ durationLabel(project.totalSeconds) }} · {{ money(project.totalAmount) }}</span>
+                  </div>
+                  <div class="project-share">
+                    <span>{{ project.percentage }}%</span>
+                    <div><i [style.width.%]="project.percentage"></i></div>
+                  </div>
+                </div>
+              } @empty {
+                <p class="empty">{{ translationPath + 'projects.empty' | translate }}</p>
+              }
             }
           </div>
         </div>

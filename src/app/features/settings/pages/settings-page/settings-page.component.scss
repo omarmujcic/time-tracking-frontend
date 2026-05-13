@@ -75,8 +75,7 @@ $settings-accent-soft: #2c4b42;
   }
 }
 
-.search-summary,
-.notice {
+.search-summary {
   margin: 0;
   border-radius: 8px;
   padding: 12px 14px;
@@ -86,16 +85,6 @@ $settings-accent-soft: #2c4b42;
   background: colors.$color-accent-soft;
   color: colors.$color-accent;
   font-weight: 700;
-}
-
-.notice.success {
-  background: colors.$color-accent-soft;
-  color: colors.$color-accent;
-}
-
-.notice.error {
-  background: colors.$color-danger-surface;
-  color: colors.$color-danger;
 }
 
 .settings-section {
@@ -322,8 +311,7 @@ button.danger {
     }
   }
 
-  .search-summary,
-  .notice.success {
+  .search-summary {
     background: $settings-accent-soft;
     color: $settings-text;
   }
