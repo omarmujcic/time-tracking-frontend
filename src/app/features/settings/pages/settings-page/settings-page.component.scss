@@ -126,7 +126,8 @@ $settings-accent-soft: #2c4b42;
   }
 
   input,
-  select {
+  select,
+  textarea {
     width: 100%;
     min-height: 42px;
     border: 1px solid colors.$color-border;
@@ -137,10 +138,24 @@ $settings-accent-soft: #2c4b42;
     font: inherit;
   }
 
+  textarea {
+    min-height: 92px;
+    padding: 10px 12px;
+    resize: vertical;
+  }
+
   app-report-multi-select {
     min-width: 0;
     display: block;
   }
+}
+
+.span-two {
+  grid-column: span 2;
+}
+
+.span-all {
+  grid-column: 1 / -1;
 }
 
 button {
@@ -332,10 +347,20 @@ button.danger {
 
   .settings-grid {
     input,
-    select {
+    select,
+    textarea {
       border-color: $settings-border;
       color: $settings-text;
       background: $settings-field;
+    }
+
+    input:disabled,
+    select:disabled,
+    textarea:disabled {
+      opacity: 1;
+      color: $settings-muted;
+      background: $settings-field;
+      -webkit-text-fill-color: $settings-muted;
     }
   }
 

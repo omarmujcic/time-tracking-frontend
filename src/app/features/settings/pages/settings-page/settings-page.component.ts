@@ -10,6 +10,8 @@ import { applyThemePreference } from '../../../../shared/utils/theme-preference'
 import { formatUserNumber, formatUserRateInput, parseUserDecimal } from '../../../../shared/utils/user-formatting';
 import { ReportMultiSelectComponent } from '../../../reports/components/report-multi-select/report-multi-select.component';
 import { ReportMultiSelectOption } from '../../../reports/components/report-multi-select/report-multi-select.model';
+import { InvoiceParty, InvoiceSetup, InvoiceWorkspaceSettingsRequest } from '../../../invoice/models/invoice.model';
+import { InvoiceService } from '../../../invoice/services/invoice.service';
 import {
   AccountProfile,
   DecimalSeparator,
@@ -30,7 +32,7 @@ import { PreferenceService } from '../../services/preference.service';
 import { ProjectService } from '../../services/project.service';
 import { WorkspaceService } from '../../services/workspace.service';
 
-type SettingsTab = 'account' | 'app' | 'projects' | 'organization';
+type SettingsTab = 'account' | 'app' | 'projects' | 'organization' | 'invoice';
 
 const defaultPreference: UserPreference = {
   language: 'en',
@@ -99,8 +101,9 @@ export class SettingsPageComponent {
     this.workspaces().filter((workspace) => workspace.type === 'ORGANIZATION')
   );
   protected readonly organizationMembers = signal<OrganizationMember[]>([]);
+  protected readonly invoiceSetup = signal<InvoiceSetup | null>(null);
   protected readonly canManageOrganization = computed(() => {
-    const role = this.activeWorkspace()?.role;
+    const role = this.activeWorkspace()?.role?.toUpperCase();
     return role === 'OWNER' || role === 'ADMIN';
   });
   protected readonly searchMatches = computed(() => this.matches(this.search()));
@@ -118,13 +121,15 @@ export class SettingsPageComponent {
   protected taskForm: TaskForm | null = null;
   protected organizationName = '';
   protected joinCode = '';
+  protected invoiceWorkspaceForm: InvoiceWorkspaceSettingsRequest = this.emptyInvoiceWorkspaceForm();
   private currentWorkspaceKey = '';
 
   private readonly labels: Record<SettingsTab, string> = {
     account: 'Account',
     app: 'App',
     projects: 'Projects',
-    organization: 'Organization'
+    organization: 'Organization',
+    invoice: 'Invoice'
   };
 
   constructor(
@@ -132,6 +137,7 @@ export class SettingsPageComponent {
     private readonly preferenceService: PreferenceService,
     private readonly projectService: ProjectService,
     private readonly workspaceService: WorkspaceService,
+    private readonly invoiceService: InvoiceService,
     private readonly workspaceState: WorkspaceStateFacade,
     private readonly authState: AuthStateFacade,
     private readonly confirmationDialog: ConfirmationDialogService,
@@ -150,6 +156,7 @@ export class SettingsPageComponent {
       this.taskForm = null;
       this.organizationName = this.activeWorkspace()?.type === 'ORGANIZATION' ? this.activeWorkspace()?.name ?? '' : '';
       void this.loadOrganizationMembers();
+      void this.loadInvoiceSetup();
     });
   }
 
@@ -165,6 +172,7 @@ export class SettingsPageComponent {
       this.applyTheme(preferences.themeMode);
       this.organizationName = this.activeWorkspace()?.type === 'ORGANIZATION' ? this.activeWorkspace()?.name ?? '' : '';
       await this.loadOrganizationMembers();
+      await this.loadInvoiceSetup();
     }, null);
   }
 
@@ -358,12 +366,29 @@ export class SettingsPageComponent {
     }, 'Organization code regenerated.');
   }
 
+  protected async saveInvoiceWorkspaceSettings(): Promise<void> {
+    const setup = this.invoiceSetup();
+    if (!setup || !this.canManageInvoiceWorkspaceSettings(setup)) {
+      this.showSettingsError('Only workspace owners and admins can edit invoice recipient settings.');
+      return;
+    }
+    await this.run(async () => {
+      const saved = await this.invoiceService.saveWorkspaceSettings(this.buildInvoiceWorkspaceRequest());
+      this.invoiceSetup.set(saved);
+      this.invoiceWorkspaceForm = this.invoiceWorkspaceFormFromSetup(saved);
+    }, 'Invoice settings saved.');
+  }
+
   protected label(tab: SettingsTab): string {
     return this.labels[tab];
   }
 
   protected roleLabel(role: OrganizationRole | null): string {
     return role ? role.toLowerCase() : 'personal';
+  }
+
+  protected canManageInvoiceWorkspaceSettings(setup: InvoiceSetup): boolean {
+    return setup.canManageWorkspaceSettings || this.canManageOrganization();
   }
 
   protected memberName(member: OrganizationMember): string {
@@ -376,6 +401,10 @@ export class SettingsPageComponent {
 
   protected updateProjectRate(value: string): void {
     this.projectForm.hourlyRate = parseUserDecimal(value, this.preferences.decimalSeparator);
+  }
+
+  protected updateInvoiceWorkspaceTaxRate(value: string): void {
+    this.invoiceWorkspaceForm.taxRate = parseUserDecimal(value, this.preferences.decimalSeparator) ?? 0;
   }
 
   protected rateLabel(value: number): string {
@@ -445,8 +474,99 @@ export class SettingsPageComponent {
     this.organizationMembers.set(members);
   }
 
+  private async loadInvoiceSetup(): Promise<void> {
+    const setup = await this.invoiceService.setup().catch(() => null);
+    this.invoiceSetup.set(setup);
+    this.invoiceWorkspaceForm = setup ? this.invoiceWorkspaceFormFromSetup(setup) : this.emptyInvoiceWorkspaceForm();
+  }
+
   private emptyProjectForm(): ProjectForm {
     return { id: null, name: '', status: 'ACTIVE', hourlyRate: null };
+  }
+
+  private invoiceWorkspaceFormFromSetup(setup: InvoiceSetup): InvoiceWorkspaceSettingsRequest {
+    return {
+      to: this.partyForm(setup.to),
+      nextInvoiceNumber: setup.workspaceNextInvoiceNumber || 1,
+      taxLabel: setup.workspaceTaxLabel || 'Tax',
+      taxRate: Number(setup.workspaceTaxRate) || 0,
+      terms: setup.workspaceTerms || null,
+      dueDays: setup.workspaceDueDays ?? 14
+    };
+  }
+
+  private buildInvoiceWorkspaceRequest(): InvoiceWorkspaceSettingsRequest {
+    return {
+      to: this.normalizeParty(this.invoiceWorkspaceForm.to),
+      nextInvoiceNumber: Math.max(1, Number(this.invoiceWorkspaceForm.nextInvoiceNumber) || 1),
+      taxLabel: this.invoiceWorkspaceForm.taxLabel?.trim() || 'Tax',
+      taxRate: Number(this.invoiceWorkspaceForm.taxRate) || 0,
+      terms: this.invoiceWorkspaceForm.terms?.trim() || null,
+      dueDays: Math.max(0, Number(this.invoiceWorkspaceForm.dueDays) || 0)
+    };
+  }
+
+  private emptyInvoiceWorkspaceForm(): InvoiceWorkspaceSettingsRequest {
+    return {
+      to: this.emptyInvoiceParty(),
+      nextInvoiceNumber: 1,
+      taxLabel: 'Tax',
+      taxRate: 0,
+      terms: null,
+      dueDays: 14
+    };
+  }
+
+  private partyForm(party: InvoiceParty): InvoiceParty {
+    return {
+      name: party.name || '',
+      contactPerson: party.contactPerson || '',
+      addressLine1: party.addressLine1 || '',
+      addressLine2: party.addressLine2 || '',
+      postalCode: party.postalCode || '',
+      city: party.city || '',
+      country: party.country || '',
+      email: party.email || '',
+      phone: party.phone || '',
+      taxId: party.taxId || '',
+      registrationNumber: party.registrationNumber || ''
+    };
+  }
+
+  private normalizeParty(party: InvoiceParty): InvoiceParty {
+    return {
+      name: this.clean(party.name),
+      contactPerson: this.clean(party.contactPerson),
+      addressLine1: this.clean(party.addressLine1),
+      addressLine2: this.clean(party.addressLine2),
+      postalCode: this.clean(party.postalCode),
+      city: this.clean(party.city),
+      country: this.clean(party.country),
+      email: this.clean(party.email),
+      phone: this.clean(party.phone),
+      taxId: this.clean(party.taxId),
+      registrationNumber: this.clean(party.registrationNumber)
+    };
+  }
+
+  private emptyInvoiceParty(): InvoiceParty {
+    return {
+      name: '',
+      contactPerson: '',
+      addressLine1: '',
+      addressLine2: '',
+      postalCode: '',
+      city: '',
+      country: '',
+      email: '',
+      phone: '',
+      taxId: '',
+      registrationNumber: ''
+    };
+  }
+
+  private clean(value: string | null): string | null {
+    return value?.trim() || null;
   }
 
   private matches(query: string): SettingsTab[] {
@@ -465,7 +585,8 @@ export class SettingsPageComponent {
       account: 'name username email phone password login profile',
       app: 'language theme dark light group date format decimal separator timezone',
       projects: 'project task hourly rate active inactive',
-      organization: 'organization workspace code join create regenerate owner admin member'
+      organization: 'organization workspace code join create regenerate owner admin member',
+      invoice: 'invoice recipient billing to tax terms due defaults'
     }[tab];
   }
 

@@ -316,4 +316,189 @@
       </form>
     </section>
   }
+
+  @if (matchesSection('invoice')) {
+    <section class="settings-section">
+      <div class="section-title">
+        <mat-icon aria-hidden="true">receipt_long</mat-icon>
+        <h2>Invoice</h2>
+        @if (invoiceSetup(); as setup) {
+          <span class="section-meta">{{ setup.workspaceName }} invoice settings</span>
+        }
+      </div>
+
+      @if (activeWorkspace()?.type === 'ORGANIZATION') {
+        @if (invoiceSetup(); as setup) {
+          <form class="settings-grid invoice-settings-grid" (ngSubmit)="saveInvoiceWorkspaceSettings()">
+            <label>
+              <span>Recipient business name</span>
+              <input
+                name="invoiceToName"
+                [(ngModel)]="invoiceWorkspaceForm.to.name"
+                maxlength="160"
+                required
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>Attention name</span>
+              <input
+                name="invoiceToContact"
+                [(ngModel)]="invoiceWorkspaceForm.to.contactPerson"
+                maxlength="160"
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>Email</span>
+              <input
+                name="invoiceToEmail"
+                type="email"
+                [(ngModel)]="invoiceWorkspaceForm.to.email"
+                maxlength="254"
+                required
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>Phone</span>
+              <input
+                name="invoiceToPhone"
+                [(ngModel)]="invoiceWorkspaceForm.to.phone"
+                maxlength="40"
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label class="span-two">
+              <span>Address line 1</span>
+              <input
+                name="invoiceToAddress1"
+                [(ngModel)]="invoiceWorkspaceForm.to.addressLine1"
+                maxlength="220"
+                required
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label class="span-two">
+              <span>Address line 2</span>
+              <input
+                name="invoiceToAddress2"
+                [(ngModel)]="invoiceWorkspaceForm.to.addressLine2"
+                maxlength="220"
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>Postal code</span>
+              <input
+                name="invoiceToPostal"
+                [(ngModel)]="invoiceWorkspaceForm.to.postalCode"
+                maxlength="40"
+                required
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>City</span>
+              <input
+                name="invoiceToCity"
+                [(ngModel)]="invoiceWorkspaceForm.to.city"
+                maxlength="120"
+                required
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>Country</span>
+              <input
+                name="invoiceToCountry"
+                [(ngModel)]="invoiceWorkspaceForm.to.country"
+                maxlength="120"
+                required
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>VAT / tax ID</span>
+              <input
+                name="invoiceToTaxId"
+                [(ngModel)]="invoiceWorkspaceForm.to.taxId"
+                maxlength="80"
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>Registration number</span>
+              <input
+                name="invoiceToRegistration"
+                [(ngModel)]="invoiceWorkspaceForm.to.registrationNumber"
+                maxlength="80"
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>Baseline next number</span>
+              <input
+                name="invoiceWorkspaceNextNumber"
+                type="number"
+                min="1"
+                [(ngModel)]="invoiceWorkspaceForm.nextInvoiceNumber"
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>Baseline due days</span>
+              <input
+                name="invoiceWorkspaceDueDays"
+                type="number"
+                min="0"
+                [(ngModel)]="invoiceWorkspaceForm.dueDays"
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>Baseline tax label</span>
+              <input
+                name="invoiceWorkspaceTaxLabel"
+                [(ngModel)]="invoiceWorkspaceForm.taxLabel"
+                maxlength="80"
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label>
+              <span>Baseline tax rate %</span>
+              <input
+                name="invoiceWorkspaceTaxRate"
+                type="text"
+                inputmode="decimal"
+                [ngModel]="rateInput(invoiceWorkspaceForm.taxRate)"
+                (ngModelChange)="updateInvoiceWorkspaceTaxRate($event)"
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              />
+            </label>
+            <label class="span-all">
+              <span>Baseline terms</span>
+              <textarea
+                name="invoiceWorkspaceTerms"
+                rows="3"
+                maxlength="5000"
+                [(ngModel)]="invoiceWorkspaceForm.terms"
+                [disabled]="!canManageInvoiceWorkspaceSettings(setup)"
+              ></textarea>
+            </label>
+            @if (!canManageInvoiceWorkspaceSettings(setup)) {
+              <p class="empty span-all">Only organization owners and admins can edit invoice recipient settings.</p>
+            } @else {
+              <button type="submit" [disabled]="loading()">
+                <mat-icon aria-hidden="true">save</mat-icon>
+                Save invoice settings
+              </button>
+            }
+          </form>
+        }
+      } @else {
+        <p class="empty">Personal invoice recipient and sender settings are managed from the Invoice page.</p>
+      }
+    </section>
+  }
 </section>

@@ -1,0 +1,440 @@
+<section class="invoice-page">
+  <header class="page-header">
+    <div>
+      <p>Invoice</p>
+      <h1>Generate client invoices from tracked work</h1>
+    </div>
+    @if (setup(); as currentSetup) {
+      <div class="header-actions">
+        <button type="button" class="secondary" (click)="setupMode.set(!setupMode())">
+          <mat-icon aria-hidden="true">{{ setupMode() ? 'visibility' : 'settings' }}</mat-icon>
+          {{ setupMode() ? 'Preview' : 'My invoice setup' }}
+        </button>
+        <button type="button" class="secondary" (click)="downloadGeneratedInvoice()" [disabled]="!downloadableInvoice()">
+          <mat-icon aria-hidden="true">download</mat-icon>
+          Download PDF
+        </button>
+      </div>
+    }
+  </header>
+
+  @if (loading()) {
+    <section class="panel loading-panel">
+      <mat-icon aria-hidden="true">hourglass_top</mat-icon>
+      <p>Loading invoice workspace...</p>
+    </section>
+  } @else if (setup(); as currentSetup) {
+    @if (setupMode()) {
+      <section class="panel setup-panel">
+        <div class="panel-heading">
+          <div class="panel-title">
+            <mat-icon aria-hidden="true">receipt_long</mat-icon>
+            <h2>Invoice onboarding</h2>
+          </div>
+          <span>{{ currentSetup.workspaceName }} workspace</span>
+        </div>
+
+        @if (currentSetup.workspaceType === 'ORGANIZATION' && !currentSetup.toReady && !currentSetup.canManageWorkspaceSettings) {
+          <div class="empty-state setup-warning">
+            <mat-icon aria-hidden="true">lock</mat-icon>
+            <strong>Organization recipient is not ready</strong>
+            <span>Ask a workspace owner or admin to complete the invoice recipient in Settings before invoices can be generated.</span>
+          </div>
+        }
+          <form class="setup-form" (ngSubmit)="saveSetup()">
+            <section class="party-editor">
+              <div class="section-title">
+                <mat-icon aria-hidden="true">person_pin_circle</mat-icon>
+                <h3>From</h3>
+              </div>
+              <div class="field-grid">
+                <label>
+                  <span>Business name</span>
+                  <input name="fromName" [(ngModel)]="userSettingsForm.from.name" maxlength="160" required />
+                </label>
+                <label>
+                  <span>Contact name (optional)</span>
+                  <input name="fromContact" [(ngModel)]="userSettingsForm.from.contactPerson" maxlength="160" placeholder="Person shown under the business name" />
+                </label>
+                <label class="wide">
+                  <span>Address line 1</span>
+                  <input name="fromAddress1" [(ngModel)]="userSettingsForm.from.addressLine1" maxlength="220" required />
+                </label>
+                <label class="wide">
+                  <span>Address line 2</span>
+                  <input name="fromAddress2" [(ngModel)]="userSettingsForm.from.addressLine2" maxlength="220" />
+                </label>
+                <label>
+                  <span>Postal code</span>
+                  <input name="fromPostal" [(ngModel)]="userSettingsForm.from.postalCode" maxlength="40" required />
+                </label>
+                <label>
+                  <span>City</span>
+                  <input name="fromCity" [(ngModel)]="userSettingsForm.from.city" maxlength="120" required />
+                </label>
+                <label>
+                  <span>Country</span>
+                  <input name="fromCountry" [(ngModel)]="userSettingsForm.from.country" maxlength="120" required />
+                </label>
+                <label>
+                  <span>Email</span>
+                  <input name="fromEmail" type="email" [(ngModel)]="userSettingsForm.from.email" maxlength="254" required />
+                </label>
+                <label>
+                  <span>Phone</span>
+                  <input name="fromPhone" [(ngModel)]="userSettingsForm.from.phone" maxlength="40" />
+                </label>
+                <label>
+                  <span>VAT / tax ID</span>
+                  <input name="fromTax" [(ngModel)]="userSettingsForm.from.taxId" maxlength="80" />
+                </label>
+                <label>
+                  <span>Registration number</span>
+                  <input name="fromRegistration" [(ngModel)]="userSettingsForm.from.registrationNumber" maxlength="80" />
+                </label>
+              </div>
+            </section>
+
+            @if (currentSetup.workspaceType === 'PERSONAL') {
+              <section class="party-editor">
+                <div class="section-title">
+                  <mat-icon aria-hidden="true">domain</mat-icon>
+                  <h3>To</h3>
+                </div>
+                <div class="field-grid">
+                  <label>
+                    <span>Business name</span>
+                    <input name="toName" [(ngModel)]="workspaceSettingsForm.to.name" maxlength="160" required />
+                  </label>
+                  <label>
+                    <span>Attention name (optional)</span>
+                    <input name="toContact" [(ngModel)]="workspaceSettingsForm.to.contactPerson" maxlength="160" placeholder="Person receiving the invoice" />
+                  </label>
+                  <label class="wide">
+                    <span>Address line 1</span>
+                    <input name="toAddress1" [(ngModel)]="workspaceSettingsForm.to.addressLine1" maxlength="220" required />
+                  </label>
+                  <label class="wide">
+                    <span>Address line 2</span>
+                    <input name="toAddress2" [(ngModel)]="workspaceSettingsForm.to.addressLine2" maxlength="220" />
+                  </label>
+                  <label>
+                    <span>Postal code</span>
+                    <input name="toPostal" [(ngModel)]="workspaceSettingsForm.to.postalCode" maxlength="40" required />
+                  </label>
+                  <label>
+                    <span>City</span>
+                    <input name="toCity" [(ngModel)]="workspaceSettingsForm.to.city" maxlength="120" required />
+                  </label>
+                  <label>
+                    <span>Country</span>
+                    <input name="toCountry" [(ngModel)]="workspaceSettingsForm.to.country" maxlength="120" required />
+                  </label>
+                  <label>
+                    <span>Email</span>
+                    <input name="toEmail" type="email" [(ngModel)]="workspaceSettingsForm.to.email" maxlength="254" required />
+                  </label>
+                  <label>
+                    <span>Phone</span>
+                    <input name="toPhone" [(ngModel)]="workspaceSettingsForm.to.phone" maxlength="40" />
+                  </label>
+                  <label>
+                    <span>VAT / tax ID</span>
+                    <input name="toTax" [(ngModel)]="workspaceSettingsForm.to.taxId" maxlength="80" />
+                  </label>
+                  <label>
+                    <span>Registration number</span>
+                    <input name="toRegistration" [(ngModel)]="workspaceSettingsForm.to.registrationNumber" maxlength="80" />
+                  </label>
+                </div>
+              </section>
+            } @else {
+              <section class="party-editor">
+                <div class="section-title">
+                  <mat-icon aria-hidden="true">domain</mat-icon>
+                  <h3>To</h3>
+                </div>
+                <div class="readonly-party">
+                  @for (line of partyLines(currentSetup.to); track line) {
+                    <span>{{ line }}</span>
+                  } @empty {
+                    <span>No organization recipient configured.</span>
+                  }
+                </div>
+              </section>
+            }
+
+            <section class="defaults-editor">
+              <div class="section-title">
+                <mat-icon aria-hidden="true">tune</mat-icon>
+                <h3>My invoice defaults</h3>
+              </div>
+              <div class="field-grid defaults-grid">
+                <label>
+                  <span>Next invoice number</span>
+                  <input name="nextInvoiceNumber" type="number" min="1" [(ngModel)]="userSettingsForm.nextInvoiceNumber" required />
+                </label>
+                <label>
+                  <span>Due in days</span>
+                  <input name="dueDays" type="number" min="0" [(ngModel)]="userSettingsForm.dueDays" required />
+                </label>
+                <label>
+                  <span>Tax label</span>
+                  <input name="setupTaxLabel" [(ngModel)]="userSettingsForm.taxLabel" maxlength="80" required />
+                </label>
+                <label>
+                  <span>Tax rate %</span>
+                  <input
+                    name="setupTaxRate"
+                    type="text"
+                    inputmode="decimal"
+                    [ngModel]="rateInput(userSettingsForm.taxRate)"
+                    (ngModelChange)="updateSetupTaxRate($event)"
+                    required
+                  />
+                </label>
+                <label class="full">
+                  <span>Default terms</span>
+                  <textarea name="setupTerms" [(ngModel)]="userSettingsForm.terms" rows="3" maxlength="5000"></textarea>
+                </label>
+              </div>
+            </section>
+
+            <div class="setup-actions">
+              <button type="submit" [disabled]="savingSetup()">
+                <mat-icon aria-hidden="true">save</mat-icon>
+                Save my invoice setup
+              </button>
+            </div>
+          </form>
+      </section>
+    }
+
+    @if (!setupMode()) {
+      <section class="panel controls-panel">
+        <div class="panel-heading">
+          <div class="panel-title">
+            <mat-icon aria-hidden="true">fact_check</mat-icon>
+            <h2>Generate invoice</h2>
+          </div>
+          <span>{{ currentSetup.workspaceName }} · {{ currentSetup.currency }}</span>
+        </div>
+        <div class="controls-grid">
+          <label>
+            <span>Start date</span>
+            <app-date-picker
+              mode="date"
+              [dateFormat]="preferences().dateFormat"
+              placeholder="Start date"
+              [value]="startDate()"
+              (valueChange)="updateStartDate($event)"
+            />
+          </label>
+          <label>
+            <span>End date</span>
+            <app-date-picker
+              mode="date"
+              [dateFormat]="preferences().dateFormat"
+              placeholder="End date"
+              [value]="endDate()"
+              (valueChange)="updateEndDate($event)"
+            />
+          </label>
+          <app-report-multi-select
+            label="Projects"
+            [placeholder]="selectedProjectLabel()"
+            [options]="projectOptions()"
+            [selectedValues]="selectedProjectKeys()"
+            (selectedValuesChange)="updateProjectSelection($event)"
+          />
+          <label>
+            <span>Invoice number</span>
+            <input
+              name="invoiceNumber"
+              [ngModel]="invoiceNumber()"
+              (ngModelChange)="updateInvoiceNumber($event)"
+              maxlength="80"
+            />
+          </label>
+          <label>
+            <span>Issue date</span>
+            <app-date-picker
+              mode="date"
+              [dateFormat]="preferences().dateFormat"
+              placeholder="Issue date"
+              [value]="issueDate()"
+              (valueChange)="updateIssueDate($event)"
+            />
+          </label>
+          <label>
+            <span>Due date</span>
+            <app-date-picker
+              mode="date"
+              [dateFormat]="preferences().dateFormat"
+              placeholder="Due date"
+              [value]="dueDate()"
+              (valueChange)="updateDueDate($event)"
+            />
+          </label>
+          <label>
+            <span>Tax label</span>
+            <input name="taxLabel" [ngModel]="taxLabel()" (ngModelChange)="updateTaxLabel($event)" maxlength="80" />
+          </label>
+          <label>
+            <span>Tax rate %</span>
+            <input
+              name="taxRate"
+              type="text"
+              inputmode="decimal"
+              [ngModel]="rateInput(taxRate())"
+              (ngModelChange)="updateTaxRate($event)"
+            />
+          </label>
+          <label class="terms-control">
+            <span>Terms</span>
+            <textarea
+              name="terms"
+              rows="3"
+              maxlength="5000"
+              [ngModel]="terms()"
+              (ngModelChange)="updateTerms($event)"
+            ></textarea>
+          </label>
+          <div class="control-actions">
+            <button type="button" class="secondary" (click)="refreshPreview()" [disabled]="previewLoading()">
+              <mat-icon aria-hidden="true">refresh</mat-icon>
+              Refresh
+            </button>
+            <button type="button" (click)="generateInvoice()" [disabled]="generating() || !selectedLines().length">
+              <mat-icon aria-hidden="true">picture_as_pdf</mat-icon>
+              Generate PDF
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="invoice-workspace">
+        @if (invoiceDocument(); as document) {
+        <article class="invoice-document panel" [class.saved-document]="document.saved">
+          @if (document.saved) {
+            <div class="saved-banner">
+              <div>
+                <mat-icon aria-hidden="true">history</mat-icon>
+                <span>Viewing saved invoice snapshot</span>
+              </div>
+              <button type="button" class="secondary compact" (click)="backToDraft()">
+                <mat-icon aria-hidden="true">edit_note</mat-icon>
+                Back to draft
+              </button>
+            </div>
+          }
+          <div class="invoice-top">
+            <strong class="sender-name">{{ document.from.name }}</strong>
+            <div>
+              <h2>Invoice: {{ document.invoiceNumber }}</h2>
+              <span>Issued on: {{ date(document.issueDate) }}</span>
+              <span>Due by: {{ date(document.dueDate) }}</span>
+            </div>
+          </div>
+
+          <div class="party-columns">
+            <section>
+              <strong>From</strong>
+              @for (line of partyLines(document.from); track line) {
+                <span>{{ line }}</span>
+              }
+            </section>
+            <section>
+              <strong>To</strong>
+              @for (line of partyLines(document.to); track line) {
+                <span>{{ line }}</span>
+              }
+            </section>
+          </div>
+
+          <div class="invoice-table">
+            <div class="invoice-head">
+              <span>Product</span>
+              <span>Quantity</span>
+              <span>Unit Price</span>
+              <span>Tax</span>
+              <span>Total</span>
+            </div>
+            @for (line of document.lines; track line.projectKey) {
+              <div class="invoice-row">
+                <div>
+                  <strong>{{ line.projectName }}</strong>
+                  <span>{{ line.description }}</span>
+                </div>
+                <span>{{ line.quantity | number: '1.0-2' }}</span>
+                <span>{{ money(line.unitPrice) }}</span>
+                <span>{{ line.taxRate | number: '1.2-2' }}%</span>
+                <span>{{ money(line.totalAmount) }}</span>
+              </div>
+            } @empty {
+              <p class="empty-row">No completed project work selected for this period.</p>
+            }
+          </div>
+
+          <div class="summary-block">
+            <div class="summary-title">
+              <mat-icon aria-hidden="true">bar_chart</mat-icon>
+              <strong>Invoice Summary</strong>
+            </div>
+            <div><span>Subtotal</span><strong>{{ money(document.subtotal) }}</strong></div>
+            <div><span>{{ document.taxLabel }}</span><strong>{{ money(document.taxAmount) }}</strong></div>
+            <div><span>Total</span><strong>{{ money(document.total) }}</strong></div>
+          </div>
+
+          @if (document.terms; as invoiceTerms) {
+            <footer class="terms-block">
+              <strong>Terms</strong>
+              <span>{{ invoiceTerms }}</span>
+            </footer>
+          }
+        </article>
+        }
+
+        <aside class="side-stack">
+          <section class="panel totals-panel">
+            <div class="panel-title">
+              <mat-icon aria-hidden="true">summarize</mat-icon>
+              <h2>Current draft</h2>
+            </div>
+            <div class="metric-row"><span>Selected projects</span><strong>{{ selectedLines().length }}</strong></div>
+            <div class="metric-row"><span>Subtotal</span><strong>{{ money(subtotal()) }}</strong></div>
+            <div class="metric-row"><span>Tax</span><strong>{{ money(taxAmount()) }}</strong></div>
+            <div class="metric-row total"><span>Total</span><strong>{{ money(total()) }}</strong></div>
+          </section>
+
+          <section class="panel history-panel">
+            <div class="panel-title">
+              <mat-icon aria-hidden="true">history</mat-icon>
+              <h2>Invoice history</h2>
+            </div>
+            <div class="history-list">
+              @for (invoice of history(); track invoice.id) {
+                <article>
+                  <div>
+                    <strong>{{ invoice.invoiceNumber }}</strong>
+                    <span>{{ date(invoice.periodStart) }} - {{ date(invoice.periodEnd) }}</span>
+                  </div>
+                  <div>
+                    <strong>{{ money(invoice.total) }}</strong>
+                    <span>Issued {{ date(invoice.issueDate) }}</span>
+                  </div>
+                  <button type="button" class="secondary compact" (click)="viewInvoice(invoice)" [disabled]="viewingInvoiceId() === invoice.id">
+                    <mat-icon aria-hidden="true">visibility</mat-icon>
+                    View
+                  </button>
+                </article>
+              } @empty {
+                <p class="empty">No generated invoices yet.</p>
+              }
+            </div>
+          </section>
+        </aside>
+      </section>
+    }
+  }
+</section>

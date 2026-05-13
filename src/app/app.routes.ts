@@ -31,8 +31,8 @@ export const routes: Routes = [
       },
       {
         path: 'invoice',
-        component: PlaceholderPageComponent,
-        data: { titleKey: 'app.nav.invoice', icon: 'receipt_long' }
+        loadComponent: () =>
+          import('./features/invoice/pages/invoice-page/invoice-page.component').then((m) => m.InvoicePageComponent)
       },
       {
         path: 'calendar',
