@@ -3,7 +3,10 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatUserCurrency, formatUserDate, formatUserDateTime } from '../../../shared/utils/user-formatting';
 import { UserPreference } from '../../settings/models/settings.model';
-import { ReportEntry, ReportEntryGroup, ReportFilters, TimeReport } from '../models/report.model';
+import { ReportBucketSegment, ReportEntry, ReportEntryGroup, ReportFilters, TimeReport } from '../models/report.model';
+
+const noTaskSegmentKey = '__NO_TASK__';
+const taskChartColors = ['#8b5cf6', '#c17f13', '#2f6fed', '#14b8a6', '#db2777', '#65a30d', '#dc2626', '#0891b2'];
 
 @Injectable({ providedIn: 'root' })
 export class ReportPdfService {
@@ -19,7 +22,7 @@ export class ReportPdfService {
 
     y = this.drawHeader(doc, filters, preferences, y);
     y = this.drawSummary(doc, report, preferences, y + 8);
-    y = this.drawTimeChart(doc, report, y + 10);
+    y = this.drawTimeChart(doc, report, filters, y + 10);
     y = this.drawProjectBreakdown(doc, report, preferences, y + 10);
     this.drawEntries(doc, this.groupEntriesByDate(report.entries), preferences, y + 10);
 
@@ -74,9 +77,11 @@ export class ReportPdfService {
     return y + height * 2 + gap;
   }
 
-  private drawTimeChart(doc: jsPDF, report: TimeReport, y: number): number {
-    y = this.ensureSpace(doc, y, 78);
-    this.drawSectionCard(doc, 'Worked time by period', y, 78);
+  private drawTimeChart(doc: jsPDF, report: TimeReport, filters: ReportFilters, y: number): number {
+    const stackedByTask = this.shouldDrawStackedTimeChart(report, filters);
+    const height = stackedByTask ? 90 : 78;
+    y = this.ensureSpace(doc, y, height);
+    this.drawSectionCard(doc, 'Worked time by period', y, height);
 
     const chartX = this.margin + 8;
     const chartY = y + 18;
@@ -92,13 +97,39 @@ export class ReportPdfService {
       doc.line(chartX, lineY, chartX + chartWidth, lineY);
     }
 
+    if (stackedByTask) {
+      const datasets = this.taskChartDatasets(report);
+      report.buckets.forEach((bucket, bucketIndex) => {
+        let offsetHeight = 0;
+        datasets.forEach((dataset) => {
+          const hours = dataset.hoursByBucket[bucketIndex] ?? 0;
+          if (!hours) {
+            return;
+          }
+          const segmentHeight = (hours / maxHours) * chartHeight;
+          const x = chartX + bucketIndex * (barWidth + barGap);
+          const top = chartY + chartHeight - offsetHeight - segmentHeight;
+          doc.setFillColor(dataset.color);
+          doc.roundedRect(x, top, barWidth, Math.max(0.8, segmentHeight), 0.6, 0.6, 'F');
+          offsetHeight += segmentHeight;
+        });
+        if (bucketIndex % Math.ceil(report.buckets.length / 8) === 0) {
+          doc.setTextColor(this.muted);
+          doc.setFontSize(6);
+          doc.text(bucket.label, chartX + bucketIndex * (barWidth + barGap), chartY + chartHeight + 5, { angle: 45 });
+        }
+      });
+      this.drawTaskLegend(doc, datasets, chartX, y + 70);
+      return y + height;
+    }
+
     report.buckets.forEach((bucket, index) => {
       const hours = bucket.totalSeconds / 3600;
-      const height = (hours / maxHours) * chartHeight;
+      const barHeight = (hours / maxHours) * chartHeight;
       const x = chartX + index * (barWidth + barGap);
-      const top = chartY + chartHeight - height;
+      const top = chartY + chartHeight - barHeight;
       doc.setFillColor(this.accent);
-      doc.roundedRect(x, top, barWidth, Math.max(0.8, height), 0.8, 0.8, 'F');
+      doc.roundedRect(x, top, barWidth, Math.max(0.8, barHeight), 0.8, 0.8, 'F');
       if (index % Math.ceil(report.buckets.length / 8) === 0) {
         doc.setTextColor(this.muted);
         doc.setFontSize(6);
@@ -220,6 +251,83 @@ export class ReportPdfService {
       groups.set(entry.groupKey, group);
     });
     return Array.from(groups.values());
+  }
+
+  private shouldDrawStackedTimeChart(report: TimeReport, filters: ReportFilters): boolean {
+    return Boolean(
+      filters.projectNames.length === 1
+      && report.buckets.some((bucket) => bucket.taskSegments?.length)
+    );
+  }
+
+  private taskChartDatasets(report: TimeReport): { key: string; label: string; color: string; hoursByBucket: number[] }[] {
+    return this.taskBreakdown(report)
+      .map((task, index) => ({
+        key: task.key,
+        label: task.label,
+        color: this.taskColor(task.key, index),
+        hoursByBucket: report.buckets.map((bucket) => {
+          const matchingSegment = bucket.taskSegments?.find((bucketSegment) => this.taskSegmentKey(bucketSegment) === task.key);
+          return (matchingSegment?.totalSeconds ?? 0) / 3600;
+        })
+      }));
+  }
+
+  private taskBreakdown(report: TimeReport): { key: string; label: string; totalSeconds: number }[] {
+    const totals = new Map<string, { label: string; totalSeconds: number }>();
+    report.buckets.forEach((bucket) => {
+      bucket.taskSegments?.forEach((segment) => {
+        const key = this.taskSegmentKey(segment);
+        const total = totals.get(key) ?? { label: this.taskSegmentLabel(segment), totalSeconds: 0 };
+        total.totalSeconds += segment.totalSeconds;
+        totals.set(key, total);
+      });
+    });
+    return Array.from(totals.entries())
+      .map(([key, task]) => ({ key, label: task.label, totalSeconds: task.totalSeconds }))
+      .sort((first, second) => second.totalSeconds - first.totalSeconds || first.label.localeCompare(second.label));
+  }
+
+  private drawTaskLegend(
+    doc: jsPDF,
+    datasets: { label: string; color: string }[],
+    x: number,
+    y: number
+  ): void {
+    let cursorX = x;
+    let cursorY = y;
+    datasets.slice(0, 8).forEach((dataset) => {
+      const label = dataset.label.length > 22 ? `${dataset.label.slice(0, 19)}...` : dataset.label;
+      const width = doc.getTextWidth(label) + 8;
+      if (cursorX + width > this.pageWidth(doc) - this.margin) {
+        cursorX = x;
+        cursorY += 5;
+      }
+      doc.setFillColor(dataset.color);
+      doc.rect(cursorX, cursorY - 2.5, 3, 3, 'F');
+      doc.setTextColor(this.muted);
+      doc.setFontSize(7);
+      doc.text(label, cursorX + 5, cursorY);
+      cursorX += width + 4;
+    });
+  }
+
+  private taskSegmentKey(segment: ReportBucketSegment): string {
+    return segment.taskId ?? noTaskSegmentKey;
+  }
+
+  private taskSegmentLabel(segment: ReportBucketSegment): string {
+    if (!segment.taskId) {
+      return 'No task';
+    }
+    return segment.projectName ? `${segment.projectName} / ${segment.taskName ?? 'No task'}` : segment.taskName ?? 'No task';
+  }
+
+  private taskColor(key: string, index: number): string {
+    if (key === noTaskSegmentKey) {
+      return '#6b7280';
+    }
+    return taskChartColors[index % taskChartColors.length];
   }
 
   private pageWidth(doc: jsPDF): number {

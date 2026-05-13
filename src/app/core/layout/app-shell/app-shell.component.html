@@ -26,6 +26,26 @@
       }
     </nav>
 
+    @if (showSidebarTimer()) {
+      <div class="sidebar-timer">
+        <a class="sidebar-timer-main" routerLink="/dashboard">
+          <span>Running timer</span>
+          <strong>{{ activeTimerDuration() }}</strong>
+          <small>{{ activeTimerContext() }}</small>
+        </a>
+        <div class="sidebar-timer-actions">
+          <a class="secondary-action" routerLink="/dashboard" [queryParams]="{ editTimer: 'true' }">
+            <mat-icon aria-hidden="true">edit</mat-icon>
+            Edit
+          </a>
+          <button type="button" (click)="stopSidebarTimer()" [disabled]="stoppingSidebarTimer()">
+            <mat-icon aria-hidden="true">stop_circle</mat-icon>
+            Stop
+          </button>
+        </div>
+      </div>
+    }
+
     <div class="account">
       <button type="button" class="account-trigger" (click)="toggleAccountMenu()" aria-haspopup="menu" [attr.aria-expanded]="accountMenuOpen()">
         <span>{{ user()?.username }}</span>

@@ -30,6 +30,12 @@ export class ReportService {
     filters.projectNames.forEach((projectName) => {
       params = params.append('projectNames', projectName);
     });
+    filters.taskIds.forEach((taskId) => {
+      params = params.append('taskIds', taskId);
+    });
+    if (filters.includeNoTask) {
+      params = params.set('includeNoTask', 'true');
+    }
     if (filters.minRate !== null) {
       params = params.set('minRate', String(filters.minRate));
     }

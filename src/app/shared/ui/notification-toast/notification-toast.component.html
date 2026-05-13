@@ -1,0 +1,21 @@
+@if (toast(); as notification) {
+  <div class="notification-region">
+    <section
+      class="notification-toast"
+      [class.success]="notification.type === 'success'"
+      [class.error]="notification.type === 'error'"
+      [class.info]="notification.type === 'info'"
+      [attr.role]="notification.type === 'error' ? 'alert' : 'status'"
+      aria-live="polite"
+    >
+      <mat-icon class="notification-icon" aria-hidden="true">{{ notification.icon }}</mat-icon>
+      <div class="notification-copy">
+        <strong>{{ notification.title }}</strong>
+        <p>{{ notification.message }}</p>
+      </div>
+      <button type="button" class="dismiss-button" aria-label="Dismiss notification" (click)="dismiss()">
+        <mat-icon aria-hidden="true">close</mat-icon>
+      </button>
+    </section>
+  </div>
+}

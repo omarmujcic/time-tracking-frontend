@@ -79,6 +79,90 @@ nav {
   opacity: 0.45;
 }
 
+.sidebar-timer {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid colors.$color-border;
+  border-radius: 8px;
+  background: colors.$color-accent-soft;
+  color: colors.$color-accent;
+}
+
+.sidebar-timer-main {
+  display: grid;
+  gap: 5px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.sidebar-timer span,
+.sidebar-timer small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-timer span {
+  color: colors.$color-muted;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sidebar-timer strong {
+  font-size: 1.45rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.sidebar-timer small {
+  color: colors.$color-text;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.sidebar-timer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sidebar-timer-actions button,
+.sidebar-timer-actions a {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid colors.$color-accent;
+  border-radius: 7px;
+  background: colors.$color-accent;
+  color: colors.$color-surface;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.sidebar-timer-actions .secondary-action {
+  border-color: colors.$color-success-border;
+  background: colors.$color-surface;
+  color: colors.$color-accent;
+}
+
+.sidebar-timer-actions mat-icon {
+  width: 17px;
+  height: 17px;
+  font-size: 17px;
+}
+
 .account {
   position: relative;
   margin-top: auto;
@@ -147,7 +231,7 @@ nav {
   border: 1px solid colors.$color-border;
   border-radius: 8px;
   background: colors.$color-surface;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 18px 40px colors.$color-shadow-menu;
   z-index: 10;
 
   button {
@@ -181,64 +265,90 @@ nav {
 
 :host-context([data-theme='dark']) {
   .app-shell {
-    background: #181b19;
-    color: #e3dfd7;
+    background: colors.$color-dark-background;
+    color: colors.$color-dark-text;
   }
 
   .sidebar {
-    border-right-color: #343a37;
-    background: #191d1b;
+    border-right-color: colors.$color-dark-border-muted;
+    background: colors.$color-dark-sidebar;
   }
 
   .brand {
-    color: #e3dfd7;
+    color: colors.$color-dark-text;
   }
 
   .brand-mark {
-    color: #f5f1ea;
+    color: colors.$color-dark-text-inverse;
   }
 
   .nav-item {
-    color: #aaa49a;
+    color: colors.$color-dark-muted;
   }
 
   .nav-item.active {
-    background: #23352f;
-    color: #9ed7c6;
+    background: colors.$color-dark-surface-selected;
+    color: colors.$color-dark-accent;
+  }
+
+  .sidebar-timer {
+    border-color: colors.$color-dark-border;
+    background: colors.$color-dark-surface-selected;
+    color: colors.$color-dark-accent;
+  }
+
+  .sidebar-timer span {
+    color: colors.$color-dark-muted;
+  }
+
+  .sidebar-timer small {
+    color: colors.$color-dark-text;
+  }
+
+  .sidebar-timer-actions button {
+    border-color: colors.$color-dark-accent-strong;
+    background: colors.$color-dark-accent-surface;
+    color: colors.$color-dark-text-inverse;
+  }
+
+  .sidebar-timer-actions .secondary-action {
+    border-color: colors.$color-dark-border;
+    background: colors.$color-dark-surface;
+    color: colors.$color-dark-accent;
   }
 
   .account {
-    border-top-color: #343a37;
+    border-top-color: colors.$color-dark-border-muted;
   }
 
   .account small,
   .account-trigger small {
-    color: #aaa49a;
+    color: colors.$color-dark-muted;
   }
 
   .account > button:not(.account-trigger) {
-    border-color: #3a403d;
-    background: #1f2421;
-    color: #d7d2c9;
+    border-color: colors.$color-dark-border;
+    background: colors.$color-dark-surface-strong;
+    color: colors.$color-dark-text-soft;
   }
 
   .account-menu {
-    border-color: #3a403d;
-    background: #171a18;
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    border-color: colors.$color-dark-border;
+    background: colors.$color-dark-menu;
+    box-shadow: 0 18px 40px colors.$color-dark-shadow;
 
     button {
-      color: #d7d2c9;
+      color: colors.$color-dark-text-soft;
 
       &.active,
       &:hover {
-        background: #23352f;
-        color: #e6f2ee;
+        background: colors.$color-dark-surface-selected;
+        color: colors.$color-dark-text;
       }
     }
 
     mat-icon {
-      color: #70aa99;
+      color: colors.$color-dark-accent-strong;
     }
   }
 }

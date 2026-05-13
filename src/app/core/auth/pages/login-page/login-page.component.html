@@ -36,10 +36,6 @@
         />
       </label>
 
-      @if (error()) {
-        <p class="error">{{ error() }}</p>
-      }
-
       <button class="submit" type="submit" [disabled]="loading()">
         {{ loading() ? (translationPath + 'form.pleaseWait' | translate) : (submitLabelKey() | translate) }}
       </button>

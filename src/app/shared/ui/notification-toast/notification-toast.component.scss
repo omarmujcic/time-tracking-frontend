@@ -1,0 +1,115 @@
+@use '../../../../styles/colors' as colors;
+
+.notification-region {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 1200;
+  width: min(600px, calc(100vw - 32px));
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.notification-toast {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid colors.$color-success-border;
+  border-radius: 8px;
+  background: colors.$color-surface;
+  color: colors.$color-text;
+  box-shadow: 0 18px 48px colors.$color-shadow-toast;
+  pointer-events: auto;
+}
+
+.notification-toast.error {
+  border-color: colors.$color-danger-border;
+}
+
+.notification-toast.info {
+  border-color: colors.$color-border-strong;
+}
+
+.notification-icon {
+  color: colors.$color-accent;
+}
+
+.notification-toast.error .notification-icon {
+  color: colors.$color-danger;
+}
+
+.notification-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+
+  strong {
+    color: colors.$color-heading;
+    font-size: 1rem;
+    line-height: 1.2;
+  }
+
+  p {
+    margin: 0;
+    color: colors.$color-muted;
+    font-size: 0.94rem;
+    line-height: 1.45;
+  }
+}
+
+.dismiss-button {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid colors.$color-border;
+  border-radius: 8px;
+  background: transparent;
+  color: colors.$color-muted;
+  cursor: pointer;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+:host-context([data-theme='dark']) {
+  .notification-toast {
+    border-color: colors.$color-dark-toast-border;
+    background: colors.$color-dark-surface;
+    color: colors.$color-dark-text;
+    box-shadow: 0 18px 48px colors.$color-dark-toast-shadow;
+  }
+
+  .notification-toast.error {
+    border-color: colors.$color-dark-toast-danger-border;
+  }
+
+  .notification-toast.info {
+    border-color: colors.$color-dark-border;
+  }
+
+  .notification-icon {
+    color: colors.$color-dark-accent;
+  }
+
+  .notification-copy {
+    strong {
+      color: colors.$color-dark-text;
+    }
+
+    p {
+      color: colors.$color-dark-muted;
+    }
+  }
+
+  .dismiss-button {
+    border-color: colors.$color-dark-border;
+    color: colors.$color-dark-muted;
+  }
+}

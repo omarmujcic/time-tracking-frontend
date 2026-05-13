@@ -4,6 +4,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { DatePickerComponent } from '../../../../shared/ui/date-picker/date-picker.component';
+import { NotificationToastService } from '../../../../shared/ui/notification-toast/notification-toast.service';
+import { httpErrorMessage } from '../../../../shared/utils/http-error-message';
 import {
   formatUserCurrency,
   formatUserDate,
@@ -18,10 +20,12 @@ import { ReportMultiSelectComponent } from '../../components/report-multi-select
 import { ReportMultiSelectOption } from '../../components/report-multi-select/report-multi-select.model';
 import {
   ProjectEntryGroup,
+  ReportBucketSegment,
   ReportEntry,
   ReportEntryGroup,
   ReportFilterOptions,
   ReportFilters,
+  ReportTaskBreakdown,
   ReportView,
   TimeReport
 } from '../../models/report.model';
@@ -29,6 +33,11 @@ import { ReportPdfService } from '../../services/report-pdf.service';
 import { ReportService } from '../../services/report.service';
 
 Chart.register(...registerables);
+
+const noTaskFilterValue = '__NO_TASK__';
+const noTaskSegmentKey = '__NO_TASK__';
+const projectChartColors = ['#176b5d', '#2f6fed', '#b7791f', '#8a4fff', '#c2410c', '#0f766e', '#be185d', '#4b5563'];
+const taskChartColors = ['#8b5cf6', '#c17f13', '#2f6fed', '#14b8a6', '#db2777', '#65a30d', '#dc2626', '#0891b2'];
 
 const defaultPreference: UserPreference = {
   language: 'en',
@@ -55,12 +64,19 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
   protected readonly report = signal<TimeReport | null>(null);
   protected readonly groupedEntriesEnabled = signal(true);
   protected readonly preferences = signal<UserPreference>({ ...defaultPreference });
-  protected readonly options = signal<ReportFilterOptions>({ users: [], projects: [], rates: [] });
+  protected readonly options = signal<ReportFilterOptions>({ users: [], projects: [], tasks: [], rates: [], hasNoTask: false });
   protected readonly expandedProjects = signal<Set<string>>(new Set());
   protected readonly viewOptions: ReportView[] = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'CUSTOM'];
   protected readonly filters: ReportFilters = this.defaultFilters();
+  protected readonly appliedFilters = signal<ReportFilters>(this.cloneFilters(this.filters));
   protected readonly projectEntryGroups = computed(() => this.entryGroupsByProject(this.report()?.entries ?? []));
   protected readonly groupedEntries = computed(() => this.entryGroupsByDate(this.report()?.entries ?? []));
+  protected readonly taskBreakdown = computed(() => this.taskBreakdownForReport(this.report()));
+  protected readonly taskBreakdownStart = signal(0);
+  protected readonly visibleTaskBreakdown = computed(() => {
+    const start = Math.min(this.taskBreakdownStart(), this.maxTaskBreakdownStart());
+    return this.taskBreakdown().slice(start, start + 3);
+  });
   protected readonly userOptions = computed<ReportMultiSelectOption[]>(() =>
     this.options().users.map((user) => ({
       value: user.id,
@@ -73,6 +89,50 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
       label: project
     }))
   );
+  protected taskOptions(): ReportMultiSelectOption[] {
+    const selectedProjects = new Set(this.filters.projectNames);
+    const projectScopedTasks = this.options().tasks
+      .filter((task) => !selectedProjects.size || selectedProjects.has(task.projectName))
+      .map((task) => ({
+        value: task.id,
+        label: this.taskOptionLabel(task.name, task.projectName, selectedProjects.size > 0)
+      }));
+    if (!this.options().hasNoTask) {
+      return projectScopedTasks;
+    }
+    return [
+      ...projectScopedTasks,
+      {
+        value: noTaskFilterValue,
+        label: this.translation('entry.noTask')
+      }
+    ];
+  }
+
+  protected taskFilterValues(): string[] {
+    return [
+      ...this.filters.taskIds,
+      ...(this.filters.includeNoTask ? [noTaskFilterValue] : [])
+    ];
+  }
+
+  protected taskChartMode(): boolean {
+    return this.appliedFilters().projectNames.length === 1;
+  }
+
+  protected taskBreakdownColor(task: ReportTaskBreakdown, index: number): string {
+    return this.taskColor(this.taskBreakdownStart() + index);
+  }
+
+  protected maxTaskBreakdownStart(): number {
+    return Math.max(0, this.taskBreakdown().length - 3);
+  }
+
+  protected moveTaskBreakdown(direction: number): void {
+    this.taskBreakdownStart.update((start) =>
+      Math.min(this.maxTaskBreakdownStart(), Math.max(0, start + direction))
+    );
+  }
 
   private chartsReady = false;
   private timeChart?: Chart;
@@ -84,6 +144,7 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
     private readonly reportPdfService: ReportPdfService,
     private readonly preferenceService: PreferenceService,
     private readonly workspaceState: WorkspaceStateFacade,
+    private readonly notifications: NotificationToastService,
     private readonly translateService: TranslateService
   ) {
     this.loadReports();
@@ -95,6 +156,8 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
       this.currentWorkspaceKey = workspaceKey;
       this.filters.userIds = [];
       this.filters.projectNames = [];
+      this.filters.taskIds = [];
+      this.filters.includeNoTask = false;
       void this.loadReports();
     });
   }
@@ -112,18 +175,23 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
   protected async loadReports(): Promise<void> {
     this.loading.set(true);
     this.loadError.set(null);
+    const requestFilters = this.cloneFilters(this.filters);
     try {
       const [options, report, preferences] = await Promise.all([
         this.reportService.filterOptions(),
-        this.reportService.timeReport(this.filters),
+        this.reportService.timeReport(requestFilters),
         this.preferenceService.get().catch(() => null)
       ]);
       this.options.set(options);
       this.report.set(report);
+      this.appliedFilters.set(requestFilters);
+      this.taskBreakdownStart.set(0);
       this.applyEntryGroupingPreference(preferences, report);
       this.scheduleRenderCharts();
-    } catch {
-      this.loadError.set(this.translation('error.load'));
+    } catch (error) {
+      const message = httpErrorMessage(error, this.translation('error.load'));
+      this.loadError.set(message);
+      this.notifications.error(message, 'Could not load reports');
     } finally {
       this.loading.set(false);
     }
@@ -138,12 +206,23 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
   }
 
   protected applyFilters(): void {
+    this.pruneTaskFiltersForProjects();
     this.loadReports();
   }
 
   protected resetFilters(): void {
     Object.assign(this.filters, this.defaultFilters());
     this.loadReports();
+  }
+
+  protected updateProjectFilter(projectNames: string[]): void {
+    this.filters.projectNames = projectNames;
+    this.pruneTaskFiltersForProjects();
+  }
+
+  protected updateTaskFilter(values: string[]): void {
+    this.filters.taskIds = values.filter((value) => value !== noTaskFilterValue);
+    this.filters.includeNoTask = values.includes(noTaskFilterValue);
   }
 
   protected durationLabel(seconds: number): string {
@@ -201,7 +280,8 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const anchor = document.createElement('a');
     anchor.href = URL.createObjectURL(blob);
-    anchor.download = `time-report-${this.filters.startDate}-${this.filters.endDate}.csv`;
+    const appliedFilters = this.appliedFilters();
+    anchor.download = `time-report-${appliedFilters.startDate}-${appliedFilters.endDate}.csv`;
     anchor.click();
     URL.revokeObjectURL(anchor.href);
   }
@@ -211,7 +291,7 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
     if (!report) {
       return;
     }
-    this.reportPdfService.generate(report, this.filters, this.preferences());
+    this.reportPdfService.generate(report, this.appliedFilters(), this.preferences());
   }
 
   protected toggleProject(projectName: string): void {
@@ -257,18 +337,20 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.timeChart?.destroy();
+    const stackedByTask = this.shouldStackTimeChart(report);
+    const datasets = stackedByTask ? this.taskChartDatasets(report) : [
+      {
+        label: this.translation('charts.hours'),
+        data: report.buckets.map((bucket) => Number((bucket.totalSeconds / 3600).toFixed(2))),
+        backgroundColor: '#176b5d',
+        borderRadius: 5
+      }
+    ];
     const config: ChartConfiguration<'bar'> = {
       type: 'bar',
       data: {
         labels: report.buckets.map((bucket) => bucket.label),
-        datasets: [
-          {
-            label: this.translation('charts.hours'),
-            data: report.buckets.map((bucket) => Number((bucket.totalSeconds / 3600).toFixed(2))),
-            backgroundColor: '#176b5d',
-            borderRadius: 5
-          }
-        ]
+        datasets
       },
       options: {
         responsive: true,
@@ -277,13 +359,13 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (context) => `${context.parsed.y}h`
+              label: (context) => `${context.dataset.label}: ${this.durationLabel(Math.round((context.parsed.y || 0) * 3600))}`
             }
           }
         },
         scales: {
-          x: { grid: { display: false } },
-          y: { beginAtZero: true, ticks: { callback: (value) => `${value}h` } }
+          x: { stacked: stackedByTask, grid: { display: false } },
+          y: { stacked: stackedByTask, beginAtZero: true, ticks: { callback: (value) => `${value}h` } }
         }
       }
     };
@@ -297,15 +379,24 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.projectChart?.destroy();
-    const colors = ['#176b5d', '#2f6fed', '#b7791f', '#8a4fff', '#c2410c', '#0f766e', '#be185d', '#4b5563'];
+    const taskChartMode = this.taskChartMode();
+    const taskBreakdown = this.taskBreakdown();
+    const labels = taskChartMode
+      ? taskBreakdown.map((task) => task.label)
+      : report.projects.map((project) => project.projectName);
+    const data = taskChartMode
+      ? taskBreakdown.map((task) => task.totalSeconds)
+      : report.projects.map((project) => project.totalSeconds);
     this.projectChart = new Chart(canvas, {
       type: 'doughnut',
       data: {
-        labels: report.projects.map((project) => project.projectName),
+        labels,
         datasets: [
           {
-            data: report.projects.map((project) => project.totalSeconds),
-            backgroundColor: report.projects.map((_, index) => colors[index % colors.length]),
+            data,
+            backgroundColor: taskChartMode
+              ? taskBreakdown.map((_, index) => this.taskColor(index))
+              : report.projects.map((_, index) => projectChartColors[index % projectChartColors.length]),
             borderColor: '#ffffff',
             borderWidth: 2
           }
@@ -316,7 +407,7 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
         maintainAspectRatio: false,
         cutout: '62%',
         plugins: {
-          legend: { position: 'bottom' },
+          legend: { display: false },
           tooltip: {
             callbacks: {
               label: (context) => {
@@ -369,9 +460,109 @@ export class ReportsPageComponent implements AfterViewInit, OnDestroy {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       userIds: [],
       projectNames: [],
+      taskIds: [],
+      includeNoTask: false,
       minRate: null,
       maxRate: null,
     };
+  }
+
+  private pruneTaskFiltersForProjects(): void {
+    if (!this.filters.projectNames.length || !this.filters.taskIds.length) {
+      return;
+    }
+    const selectedProjects = new Set(this.filters.projectNames);
+    const allowedTaskIds = new Set(
+      this.options().tasks
+        .filter((task) => selectedProjects.has(task.projectName))
+        .map((task) => task.id)
+    );
+    this.filters.taskIds = this.filters.taskIds.filter((taskId) => allowedTaskIds.has(taskId));
+  }
+
+  private shouldStackTimeChart(report: TimeReport): boolean {
+    return Boolean(
+      this.taskChartMode()
+      && report.buckets.some((bucket) => bucket.taskSegments?.length)
+    );
+  }
+
+  private taskBreakdownForReport(report: TimeReport | null): ReportTaskBreakdown[] {
+    if (!report) {
+      return [];
+    }
+    const totals = new Map<string, { label: string; totalSeconds: number; totalAmount: number }>();
+    report.buckets.forEach((bucket) => {
+      bucket.taskSegments?.forEach((segment) => {
+        const key = this.taskSegmentKey(segment);
+        const total = totals.get(key) ?? {
+          label: this.taskSegmentLabel(segment),
+          totalSeconds: 0,
+          totalAmount: 0
+        };
+        total.totalSeconds += segment.totalSeconds;
+        total.totalAmount += Number(segment.totalAmount);
+        totals.set(key, total);
+      });
+    });
+    const totalSeconds = Math.max(1, Array.from(totals.values()).reduce((sum, task) => sum + task.totalSeconds, 0));
+    return Array.from(totals.entries())
+      .map(([key, task]) => ({
+        key,
+        label: task.label,
+        totalSeconds: task.totalSeconds,
+        totalAmount: task.totalAmount,
+        percentage: Number(((task.totalSeconds / totalSeconds) * 100).toFixed(2))
+      }))
+      .sort((first, second) => second.totalSeconds - first.totalSeconds || first.label.localeCompare(second.label));
+  }
+
+  private taskChartDatasets(report: TimeReport): ChartConfiguration<'bar'>['data']['datasets'] {
+    return this.taskBreakdown()
+      .map((task, index) => ({
+        label: task.label,
+        data: report.buckets.map((bucket) => {
+          const matchingSegment = bucket.taskSegments?.find((bucketSegment) => this.taskSegmentKey(bucketSegment) === task.key);
+          return Number(((matchingSegment?.totalSeconds ?? 0) / 3600).toFixed(2));
+        }),
+        backgroundColor: this.taskColor(index),
+        borderRadius: 4,
+        stack: 'tasks'
+      }));
+  }
+
+  private taskSegmentKey(segment: ReportBucketSegment): string {
+    return segment.taskId ?? noTaskSegmentKey;
+  }
+
+  private taskSegmentLabel(segment: ReportBucketSegment): string {
+    if (!segment.taskId) {
+      return this.translation('entry.noTask');
+    }
+    if (!segment.projectName || this.appliedFilters().projectNames.length === 1) {
+      return segment.taskName ?? this.translation('entry.noTask');
+    }
+    return `${segment.projectName} / ${segment.taskName ?? this.translation('entry.noTask')}`;
+  }
+
+  private cloneFilters(filters: ReportFilters): ReportFilters {
+    return {
+      ...filters,
+      userIds: [...filters.userIds],
+      projectNames: [...filters.projectNames],
+      taskIds: [...filters.taskIds]
+    };
+  }
+
+  private taskOptionLabel(taskName: string, projectName: string, projectScoped: boolean): string {
+    return projectScoped ? taskName : `${projectName} / ${taskName}`;
+  }
+
+  private taskColor(index: number): string {
+    if (this.taskBreakdown()[index]?.key === noTaskSegmentKey) {
+      return '#6b7280';
+    }
+    return taskChartColors[index % taskChartColors.length];
   }
 
   private rangeFor(view: ReportView): { startDate: string; endDate: string } {

@@ -24,6 +24,10 @@ export class TimeEntryService {
     return firstValueFrom(this.http.get<TimeEntrySummary>(`${this.baseUrl}/summary`, { params: this.params(filters) }));
   }
 
+  active(): Promise<TimeEntry | null> {
+    return firstValueFrom(this.http.get<TimeEntry | null>(`${this.baseUrl}/active`));
+  }
+
   start(request: StartTimerRequest): Promise<TimeEntry> {
     return firstValueFrom(this.http.post<TimeEntry>(`${this.baseUrl}/start`, request));
   }

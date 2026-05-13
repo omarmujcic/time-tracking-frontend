@@ -3,6 +3,9 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthStateFacade } from '../../../../shared/state/auth/auth-state.facade';
 import { WorkspaceStateFacade } from '../../../../shared/state/workspace/workspace-state.facade';
+import { ConfirmationDialogService } from '../../../../shared/ui/confirm-dialog/confirm-dialog.service';
+import { NotificationToastService } from '../../../../shared/ui/notification-toast/notification-toast.service';
+import { httpErrorMessage } from '../../../../shared/utils/http-error-message';
 import { applyThemePreference } from '../../../../shared/utils/theme-preference';
 import { formatUserNumber, formatUserRateInput, parseUserDecimal } from '../../../../shared/utils/user-formatting';
 import { ReportMultiSelectComponent } from '../../../reports/components/report-multi-select/report-multi-select.component';
@@ -46,8 +49,6 @@ const defaultPreference: UserPreference = {
 })
 export class SettingsPageComponent {
   protected readonly loading = signal(false);
-  protected readonly message = signal<string | null>(null);
-  protected readonly error = signal<string | null>(null);
   protected readonly search = signal('');
   protected readonly timeZones = [
     'UTC',
@@ -132,7 +133,9 @@ export class SettingsPageComponent {
     private readonly projectService: ProjectService,
     private readonly workspaceService: WorkspaceService,
     private readonly workspaceState: WorkspaceStateFacade,
-    private readonly authState: AuthStateFacade
+    private readonly authState: AuthStateFacade,
+    private readonly confirmationDialog: ConfirmationDialogService,
+    private readonly notifications: NotificationToastService
   ) {
     this.projects = this.workspaceState.projects;
     this.workspaces = this.workspaceState.workspaces;
@@ -207,7 +210,7 @@ export class SettingsPageComponent {
 
   protected async saveProject(): Promise<void> {
     if (!this.projectForm.name.trim() || !this.projectForm.hourlyRate) {
-      this.error.set('Project name and hourly rate are required.');
+      this.showSettingsError('Project name and hourly rate are required.');
       return;
     }
     await this.run(async () => {
@@ -227,7 +230,14 @@ export class SettingsPageComponent {
   }
 
   protected async deleteProject(project: Project): Promise<void> {
-    if (!window.confirm(`Delete project ${project.name}? Used projects must be marked inactive instead.`)) {
+    const confirmed = await this.confirmationDialog.confirm({
+      title: 'Delete project',
+      message: `Delete project "${project.name}"? Used projects must be marked inactive instead.`,
+      confirmText: 'Delete project',
+      icon: 'delete',
+      variant: 'danger'
+    });
+    if (!confirmed) {
       return;
     }
     await this.run(async () => {
@@ -248,7 +258,7 @@ export class SettingsPageComponent {
 
   protected async saveTask(): Promise<void> {
     if (!this.taskForm || !this.taskForm.name.trim()) {
-      this.error.set('Task name is required.');
+      this.showSettingsError('Task name is required.');
       return;
     }
     await this.run(async () => {
@@ -264,7 +274,15 @@ export class SettingsPageComponent {
   }
 
   protected async deleteTask(project: Project, taskId: string): Promise<void> {
-    if (!window.confirm('Delete this task? Used tasks must be marked inactive instead.')) {
+    const task = project.tasks.find((option) => option.id === taskId);
+    const confirmed = await this.confirmationDialog.confirm({
+      title: 'Delete task',
+      message: `Delete task "${task?.name ?? 'this task'}"? Used tasks must be marked inactive instead.`,
+      confirmText: 'Delete task',
+      icon: 'delete',
+      variant: 'danger'
+    });
+    if (!confirmed) {
       return;
     }
     await this.run(async () => {
@@ -275,7 +293,7 @@ export class SettingsPageComponent {
 
   protected async createOrganization(): Promise<void> {
     if (!this.organizationName.trim()) {
-      this.error.set('Organization name is required.');
+      this.showSettingsError('Organization name is required.');
       return;
     }
     await this.run(async () => {
@@ -301,7 +319,7 @@ export class SettingsPageComponent {
 
   protected async joinOrganization(): Promise<void> {
     if (!this.joinCode.trim()) {
-      this.error.set('Organization code is required.');
+      this.showSettingsError('Organization code is required.');
       return;
     }
     await this.run(async () => {
@@ -398,16 +416,23 @@ export class SettingsPageComponent {
 
   private async run(action: () => Promise<void>, success: string | null): Promise<void> {
     this.loading.set(true);
-    this.error.set(null);
-    this.message.set(null);
     try {
       await action();
-      this.message.set(success);
-    } catch {
-      this.error.set('Unable to save settings. Check required fields and permissions.');
+      if (success) {
+        this.notifications.success(success);
+      }
+    } catch (error) {
+      this.notifications.error(
+        httpErrorMessage(error, 'Unable to save settings. Check required fields and permissions.'),
+        'Settings not saved'
+      );
     } finally {
       this.loading.set(false);
     }
+  }
+
+  private showSettingsError(message: string): void {
+    this.notifications.error(message, 'Check required fields');
   }
 
   private async loadOrganizationMembers(): Promise<void> {

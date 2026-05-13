@@ -1,12 +1,17 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, OnDestroy, Signal, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
+import { Subscription } from 'rxjs';
 import { AuthStateFacade } from '../../../shared/state/auth/auth-state.facade';
 import { WorkspaceStateFacade } from '../../../shared/state/workspace/workspace-state.facade';
 import { applyThemePreference } from '../../../shared/utils/theme-preference';
+import { ActiveTimerFacade } from '../../../shared/state/timer/active-timer.facade';
+import { NotificationToastService } from '../../../shared/ui/notification-toast/notification-toast.service';
+import { httpErrorMessage } from '../../../shared/utils/http-error-message';
 import { PreferenceService } from '../../../features/settings/services/preference.service';
+import { TimeEntry } from '../../../features/dashboard/models/time-entry.model';
 import { NavItem } from '../models/nav-item.model';
 
 @Component({
@@ -15,11 +20,20 @@ import { NavItem } from '../models/nav-item.model';
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.scss'
 })
-export class AppShellComponent {
+export class AppShellComponent implements OnDestroy {
   protected readonly translationPath = 'app.';
   protected readonly user;
   protected readonly workspaces;
   protected readonly accountMenuOpen = signal(false);
+  protected readonly activeTimerEntry: Signal<TimeEntry | null>;
+  protected readonly activeTimerDuration: Signal<string>;
+  protected readonly activeTimerContext: Signal<string>;
+  protected readonly currentUrl = signal('');
+  protected readonly stoppingSidebarTimer = signal(false);
+  protected readonly showSidebarTimer = computed(() => {
+    const path = this.currentUrl().split(/[?#]/)[0];
+    return Boolean(this.activeTimerEntry() && !path.startsWith('/dashboard'));
+  });
   protected readonly accountTypeLabel = computed(() => {
     const active = this.workspaces().find((workspace) => workspace.active);
     if (!active || active.type === 'PERSONAL') {
@@ -41,12 +55,36 @@ export class AppShellComponent {
   constructor(
     private readonly authState: AuthStateFacade,
     private readonly workspaceState: WorkspaceStateFacade,
-    private readonly preferenceService: PreferenceService
+    private readonly preferenceService: PreferenceService,
+    private readonly activeTimer: ActiveTimerFacade,
+    private readonly notifications: NotificationToastService,
+    private readonly router: Router
   ) {
     this.user = this.authState.user;
     this.workspaces = this.workspaceState.workspaces;
+    this.activeTimerEntry = this.activeTimer.activeEntry;
+    this.activeTimerDuration = this.activeTimer.durationLabel;
+    this.activeTimerContext = this.activeTimer.contextLabel;
     this.workspaceState.load();
     this.applyPreferences();
+    this.currentUrl.set(this.router.url);
+    this.routeSubscription = this.router.events.subscribe((event) => {
+      if (event instanceof NavigationEnd) {
+        this.currentUrl.set(event.urlAfterRedirects);
+      }
+    });
+    void this.activeTimer.loadActive();
+    effect(() => {
+      if (this.workspaceState.activeWorkspaceKey()) {
+        void this.activeTimer.loadActive();
+      }
+    });
+  }
+
+  private routeSubscription?: Subscription;
+
+  ngOnDestroy(): void {
+    this.routeSubscription?.unsubscribe();
   }
 
   protected workspaceValue(): string {
@@ -74,6 +112,21 @@ export class AppShellComponent {
     return workspaceName;
   }
 
+  protected async stopSidebarTimer(): Promise<void> {
+    if (!this.activeTimerEntry() || this.stoppingSidebarTimer()) {
+      return;
+    }
+    this.stoppingSidebarTimer.set(true);
+    try {
+      await this.activeTimer.stopActive();
+      this.notifications.success('Timer stopped.');
+    } catch (error) {
+      this.notifications.error(httpErrorMessage(error, 'Unable to stop timer.'), 'Timer not stopped');
+    } finally {
+      this.stoppingSidebarTimer.set(false);
+    }
+  }
+
   private async applyPreferences(): Promise<void> {
     try {
       const preferences = await this.preferenceService.get();
@@ -84,6 +137,7 @@ export class AppShellComponent {
   }
 
   protected logout(): void {
+    this.activeTimer.clear();
     this.authState.logout();
   }
 }
