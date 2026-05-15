@@ -1,6 +1,6 @@
-<label class="multi-select-field">
+<div class="multi-select-field">
   <span>{{ label }}</span>
-  <button type="button" class="select-trigger" [class.placeholder]="!selectedValues.length" (click)="toggleOpen()">
+  <button type="button" class="select-trigger" [class.placeholder]="!selectedValues.length" (click)="toggleOpen($event)">
     <strong>{{ displayValue }}</strong>
     <mat-icon aria-hidden="true">{{ open() ? 'expand_less' : 'expand_more' }}</mat-icon>
   </button>
@@ -47,4 +47,4 @@
       }
     </div>
   }
-</label>
+</div>

@@ -7,7 +7,7 @@
       "primary": "Primary navigation",
       "dashboard": "Dashboard",
       "reports": "Reports",
-      "import": "Import",
+      "notifications": "Notifications",
       "invoice": "Invoice",
       "calendar": "Calendar",
       "settings": "Settings",
@@ -62,7 +62,13 @@
       },
       "entries": {
         "title": "Time entries",
-        "empty": "No time entries match these filters."
+        "empty": "No time entries match these filters.",
+        "page": "Page",
+        "shown": "entries shown",
+        "expandAll": "Expand all",
+        "minimizeAll": "Minimize all",
+        "previous": "Previous",
+        "next": "Next"
       },
       "entry": {
         "project": "Project",
@@ -71,8 +77,11 @@
         "noDescription": "No description",
         "hourlyRateEur": "Hourly rate EUR",
         "rateEur": "Rate EUR",
+        "date": "Date",
         "start": "Start",
         "end": "End",
+        "selectStartTime": "Select start time",
+        "selectEndTime": "Select end time",
         "started": "Started",
         "stopped": "Stopped",
         "running": "Running",
@@ -94,10 +103,11 @@
       "error": {
         "load": "Unable to load time entries.",
         "timerRequired": "Project and hourly rate are required.",
-        "manualRequired": "Project, hourly rate, start, and end are required.",
-        "editRequired": "Project, hourly rate, and start are required.",
+        "manualRequired": "Project, hourly rate, date, start time, and end time are required.",
+        "manualRangeInvalid": "Start and end times must be valid and different.",
+        "editRequired": "Project, hourly rate, date, and start time are required.",
         "editEndRequired": "End time is required for completed entries.",
-        "actionFailed": "Action failed. Check overlapping times and required fields."
+        "actionFailed": "Action failed. Check required fields and try again."
       }
     },
     "reports": {
@@ -120,12 +130,17 @@
         "view": "Report view",
         "startDate": "Start date",
         "endDate": "End date",
+        "day": "Day",
+        "week": "Week",
+        "month": "Month",
+        "year": "Year",
         "users": "Users",
         "allUsers": "All users",
         "projects": "Projects",
         "allProjects": "All projects",
         "tasks": "Tasks",
         "allTasks": "All tasks",
+        "includeOrganizationEntries": "Include my organization entries",
         "minRate": "Min rate EUR",
         "maxRate": "Max rate EUR",
         "description": "Description words",

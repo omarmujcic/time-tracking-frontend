@@ -1,0 +1,75 @@
+<section class="notifications-page">
+  <header class="page-header">
+    <div>
+      <p>Notifications</p>
+      <h1>Review workspace updates</h1>
+    </div>
+    <div class="filter-tabs" aria-label="Notification filters">
+      @for (option of filterOptions; track option.value) {
+        <button
+          type="button"
+          class="tab-button"
+          [class.active]="statusFilter() === option.value"
+          (click)="setFilter(option.value)"
+          [disabled]="loading()"
+        >
+          {{ option.label }}
+        </button>
+      }
+    </div>
+  </header>
+
+  <section class="notifications-list">
+    @for (notification of items(); track notification.id) {
+      <article class="notification-card" [class.resolved]="notification.status === 'RESOLVED'">
+        <div class="notification-main">
+          <div class="notification-title-row">
+            <mat-icon aria-hidden="true">
+              {{ notification.type === 'PROJECT_BILLING_ISSUE' ? 'request_quote' : 'notifications' }}
+            </mat-icon>
+            <div>
+              <h2>{{ typeLabel(notification) }}</h2>
+              <span>{{ notification.subjectLabel || 'Workspace' }}</span>
+            </div>
+            <span class="status-pill" [class.open]="notification.status === 'OPEN'">
+              {{ notification.status.toLowerCase() }}
+            </span>
+          </div>
+
+          <p class="message">{{ notification.message }}</p>
+
+          <div class="meta-row">
+            <span>From {{ creatorLabel(notification) }}</span>
+            <span>{{ notification.createdAt | date: 'medium' }}</span>
+            @if (notification.status === 'RESOLVED' && notification.resolvedAt) {
+              <span>Resolved by {{ resolverLabel(notification) }} · {{ notification.resolvedAt | date: 'medium' }}</span>
+            }
+          </div>
+        </div>
+
+        <div class="notification-actions">
+          @if (notification.canResolve) {
+            <button type="button" (click)="resolve(notification)" [disabled]="loading()">
+              <mat-icon aria-hidden="true">check</mat-icon>
+              Resolve
+            </button>
+          }
+          @if (notification.canReopen) {
+            <button type="button" (click)="reopen(notification)" [disabled]="loading()">
+              <mat-icon aria-hidden="true">restart_alt</mat-icon>
+              Reopen
+            </button>
+          }
+          @if (notification.canDismiss) {
+            <button type="button" class="secondary" (click)="dismiss(notification)" [disabled]="loading()">
+              <mat-icon aria-hidden="true">visibility_off</mat-icon>
+              Dismiss
+            </button>
+          }
+        </div>
+      </article>
+    } @empty {
+      <p class="empty">No notifications match this view.</p>
+    }
+  </section>
+</section>

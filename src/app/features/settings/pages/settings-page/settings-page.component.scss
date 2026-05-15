@@ -158,6 +158,36 @@ $settings-accent-soft: #2c4b42;
   grid-column: 1 / -1;
 }
 
+.billing-editor {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid colors.$color-border;
+  border-radius: 8px;
+  background: colors.$color-surface-subtle;
+}
+
+.billing-editor-title {
+  display: grid;
+  gap: 3px;
+
+  strong {
+    color: colors.$color-heading;
+  }
+
+  span {
+    color: colors.$color-muted;
+    font-size: 0.88rem;
+  }
+}
+
+.billing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
 button {
   min-height: 42px;
   display: inline-flex;
@@ -243,6 +273,60 @@ button.danger {
   }
 }
 
+.project-details {
+  display: grid;
+  gap: 4px;
+}
+
+.task-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+
+  span {
+    border: 1px solid colors.$color-border;
+    border-radius: 999px;
+    padding: 4px 8px;
+    background: colors.$color-surface;
+    color: colors.$color-muted;
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+}
+
+.billing-issue-form {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid colors.$color-divider;
+
+  label {
+    display: grid;
+    gap: 6px;
+    color: colors.$color-muted;
+    font-size: 0.86rem;
+    font-weight: 700;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 92px;
+    border: 1px solid colors.$color-border;
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: colors.$color-text;
+    background: colors.$color-surface;
+    font: inherit;
+    resize: vertical;
+  }
+
+  .row-actions {
+    justify-content: flex-end;
+  }
+}
+
 .member-role {
   color: colors.$color-accent !important;
   font-weight: 800;
@@ -250,6 +334,11 @@ button.danger {
 }
 
 .organization-row.active {
+  border-color: colors.$color-accent;
+  background: colors.$color-accent-soft;
+}
+
+.project-row.editing {
   border-color: colors.$color-accent;
   background: colors.$color-accent-soft;
 }
@@ -333,12 +422,15 @@ button.danger {
 
   .section-title h2,
   .organization-list h3,
+  .billing-editor-title strong,
   .members-list h3 {
     color: $settings-text;
   }
 
   .section-meta,
   .settings-grid label,
+  .billing-issue-form label,
+  .billing-editor-title span,
   .project-row span,
   .organization-row span,
   .empty {
@@ -383,9 +475,26 @@ button.danger {
 
   .project-row,
   .organization-row,
-  .member-row {
+  .member-row,
+  .billing-editor {
     border-color: $settings-border;
     background: $settings-panel-soft;
+  }
+
+  .task-pills span {
+    border-color: $settings-border;
+    background: $settings-field;
+    color: $settings-muted;
+  }
+
+  .billing-issue-form {
+    border-top-color: $settings-border;
+
+    textarea {
+      border-color: $settings-border;
+      color: $settings-text;
+      background: $settings-field;
+    }
   }
 
   .member-role {
@@ -393,6 +502,11 @@ button.danger {
   }
 
   .organization-row.active {
+    border-color: $settings-accent;
+    background: $settings-accent-soft;
+  }
+
+  .project-row.editing {
     border-color: $settings-accent;
     background: $settings-accent-soft;
   }
@@ -416,6 +530,14 @@ button.danger {
   }
 
   .organization-row {
+    grid-template-columns: 1fr;
+  }
+
+  .project-row {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-grid {
     grid-template-columns: 1fr;
   }
 }

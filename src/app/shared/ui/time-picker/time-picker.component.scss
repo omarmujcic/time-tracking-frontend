@@ -1,0 +1,166 @@
+@use '../../../../styles/colors' as colors;
+
+:host {
+  position: relative;
+  display: block;
+}
+
+.time-field {
+  display: grid;
+  gap: 7px;
+}
+
+.time-field > span {
+  color: colors.$color-muted;
+  font-size: 0.82rem;
+}
+
+.time-trigger {
+  width: 100%;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid colors.$color-border-strong;
+  border-radius: 6px;
+  background: colors.$color-surface;
+  color: colors.$color-text;
+  font: inherit;
+  font-size: 0.92rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.time-trigger:focus,
+.time-trigger:focus-visible {
+  border-color: colors.$color-accent;
+  outline: 2px solid colors.$color-focus-ring;
+}
+
+.time-trigger.placeholder strong {
+  color: colors.$color-placeholder;
+  font-weight: 500;
+}
+
+.time-trigger strong {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time-trigger mat-icon {
+  width: 20px;
+  height: 20px;
+  color: colors.$color-muted;
+  font-size: 20px;
+}
+
+.time-popover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 260px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid colors.$color-border;
+  border-radius: 8px;
+  background: colors.$color-surface;
+  box-shadow: 0 18px 45px rgba(18, 32, 52, 0.14);
+}
+
+.time-inputs,
+.minute-steps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.time-inputs label {
+  display: grid;
+  gap: 5px;
+}
+
+.time-inputs span {
+  color: colors.$color-subtle;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.time-inputs input,
+.minute-steps button,
+.preset-grid button {
+  min-height: 36px;
+  border: 1px solid colors.$color-border-strong;
+  border-radius: 6px;
+  background: colors.$color-surface;
+  color: colors.$color-text;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.time-inputs input {
+  width: 100%;
+  padding: 0 8px;
+}
+
+.minute-steps button,
+.preset-grid button {
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.preset-grid button.selected,
+.preset-grid button:hover,
+.minute-steps button:hover {
+  border-color: colors.$color-accent;
+  background: colors.$color-accent-hover;
+  color: colors.$color-accent;
+}
+
+:host-context([data-theme='dark']) {
+  .time-field > span,
+  .time-trigger.placeholder strong,
+  .time-trigger mat-icon,
+  .time-inputs span {
+    color: colors.$color-dark-muted;
+  }
+
+  .time-trigger,
+  .time-popover,
+  .time-inputs input,
+  .minute-steps button,
+  .preset-grid button {
+    border-color: colors.$color-dark-border;
+    background: colors.$color-dark-field;
+    color: colors.$color-dark-text;
+  }
+
+  .time-trigger:focus,
+  .time-trigger:focus-visible {
+    border-color: colors.$color-dark-accent-strong;
+    outline-color: colors.$color-dark-focus-ring;
+  }
+
+  .time-popover {
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+  }
+
+  .preset-grid button.selected,
+  .preset-grid button:hover,
+  .minute-steps button:hover {
+    border-color: colors.$color-dark-accent-strong;
+    background: colors.$color-dark-surface-selected;
+    color: colors.$color-dark-accent-strong;
+  }
+}

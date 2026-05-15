@@ -4,6 +4,7 @@ export type WorkspaceType = 'PERSONAL' | 'ORGANIZATION';
 export type OrganizationRole = 'OWNER' | 'ADMIN' | 'MEMBER';
 export type ProjectStatus = 'ACTIVE' | 'INACTIVE';
 export type TaskStatus = 'ACTIVE' | 'INACTIVE';
+export type ProjectBillingRuleType = 'HOURLY' | 'FIXED_MONTHLY' | 'MONTHLY_BASE_PLUS_OVERAGE';
 export type ThemeMode = 'SYSTEM' | 'LIGHT' | 'DARK';
 export type DecimalSeparator = 'DOT' | 'COMMA';
 
@@ -37,6 +38,7 @@ export interface UserPreference {
   language: string;
   themeMode: ThemeMode;
   groupedEntriesEnabled: boolean;
+  includeOrganizationEntriesInPersonalReports: boolean;
   dateFormat: string;
   decimalSeparator: DecimalSeparator;
   timezone: string;
@@ -49,12 +51,32 @@ export interface ProjectTask {
   status: TaskStatus;
 }
 
+export interface ProjectBillingRule {
+  id: string | null;
+  type: ProjectBillingRuleType;
+  effectiveFrom: string;
+  monthlyAmount: number | null;
+  baseAmount: number | null;
+  includedHours: number | null;
+  overageHourlyRate: number | null;
+}
+
+export interface UpsertProjectBillingRuleRequest {
+  type: ProjectBillingRuleType;
+  effectiveFrom: string;
+  monthlyAmount: number | null;
+  baseAmount: number | null;
+  includedHours: number | null;
+  overageHourlyRate: number | null;
+}
+
 export interface Project {
   id: string;
   name: string;
   status: ProjectStatus;
   hourlyRate: number;
   currency: 'EUR';
+  billingRule: ProjectBillingRule | null;
   tasks: ProjectTask[];
 }
 
@@ -62,6 +84,7 @@ export interface UpsertProjectRequest {
   name: string;
   status: ProjectStatus;
   hourlyRate: number;
+  billingRule: UpsertProjectBillingRuleRequest;
 }
 
 export interface UpsertTaskRequest {
@@ -117,6 +140,12 @@ export interface ProjectForm {
   name: string;
   status: ProjectStatus;
   hourlyRate: number | null;
+  billingRuleType: ProjectBillingRuleType;
+  billingEffectiveMonth: string;
+  monthlyAmount: number | null;
+  baseAmount: number | null;
+  includedHours: number | null;
+  overageHourlyRate: number | null;
 }
 
 export interface TaskForm {

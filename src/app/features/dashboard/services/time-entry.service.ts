@@ -6,6 +6,7 @@ import {
   StartTimerRequest,
   TimeEntry,
   TimeEntryFilters,
+  TimeEntryPage,
   TimeEntrySummary,
   UpdateTimeEntryRequest
 } from '../models/time-entry.model';
@@ -16,8 +17,8 @@ export class TimeEntryService {
 
   constructor(private readonly http: HttpClient) {}
 
-  list(filters: TimeEntryFilters): Promise<TimeEntry[]> {
-    return firstValueFrom(this.http.get<TimeEntry[]>(this.baseUrl, { params: this.params(filters) }));
+  list(filters: TimeEntryFilters): Promise<TimeEntryPage> {
+    return firstValueFrom(this.http.get<TimeEntryPage>(this.baseUrl, { params: this.params(filters) }));
   }
 
   summary(filters: TimeEntryFilters): Promise<TimeEntrySummary> {

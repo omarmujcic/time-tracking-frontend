@@ -1,5 +1,12 @@
 export type ReportView = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY' | 'CUSTOM';
 
+export type BarRadius = {
+  topLeft: number;
+  topRight: number;
+  bottomLeft: number;
+  bottomRight: number;
+};
+
 export interface ReportFilters {
   view: ReportView;
   startDate: string;
@@ -9,6 +16,7 @@ export interface ReportFilters {
   projectNames: string[];
   taskIds: string[];
   includeNoTask: boolean;
+  includeOrganizationEntries: boolean;
   minRate: number | null;
   maxRate: number | null;
 }

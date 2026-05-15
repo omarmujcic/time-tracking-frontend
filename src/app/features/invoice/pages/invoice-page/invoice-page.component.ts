@@ -33,6 +33,7 @@ const defaultPreference: UserPreference = {
   language: 'en',
   themeMode: 'SYSTEM',
   groupedEntriesEnabled: true,
+  includeOrganizationEntriesInPersonalReports: true,
   dateFormat: 'YYYY-MM-DD',
   decimalSeparator: 'DOT',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -71,12 +72,7 @@ export class InvoicePageComponent {
   protected userSettingsForm: InvoiceUserSettingsRequest = this.emptyUserSettingsForm();
   protected workspaceSettingsForm: InvoiceWorkspaceSettingsRequest = this.emptyWorkspaceSettingsForm();
 
-  protected readonly projectOptions = computed<ReportMultiSelectOption[]>(() =>
-    (this.workPreview()?.lines ?? []).map((line) => ({
-      value: line.projectKey,
-      label: `${line.projectName} · ${this.durationLabel(line.durationSeconds)} · ${this.money(line.totalAmount)}`
-    }))
-  );
+  protected readonly projectOptions = computed<ReportMultiSelectOption[]>(() => this.projectOptionsForPreview(this.workPreview()));
   protected readonly selectedLines = computed(() => {
     const selected = new Set(this.selectedProjectKeys());
     return (this.workPreview()?.lines ?? []).filter((line) => selected.has(line.projectKey));
@@ -393,11 +389,11 @@ export class InvoicePageComponent {
       const preview = await this.invoiceService.workPreview(this.startDate(), this.endDate(), this.timezone());
       this.workPreview.set(preview);
       const availableKeys = new Set(preview.lines.map((line) => line.projectKey));
-      const retained = this.selectedProjectKeys().filter((projectKey) => availableKeys.has(projectKey));
+      const retained = Array.from(new Set(this.selectedProjectKeys().filter((projectKey) => availableKeys.has(projectKey))));
       if (retained.length) {
         this.selectedProjectKeys.set(retained);
       } else if (selectAllWhenEmpty) {
-        this.selectedProjectKeys.set(preview.lines.map((line) => line.projectKey));
+        this.selectedProjectKeys.set(this.uniqueProjectKeys(preview));
       } else {
         this.selectedProjectKeys.set([]);
       }
@@ -541,6 +537,28 @@ export class InvoicePageComponent {
       taxId: '',
       registrationNumber: ''
     };
+  }
+
+  private projectOptionsForPreview(preview: InvoiceWorkPreview | null): ReportMultiSelectOption[] {
+    const totals = new Map<string, { projectName: string; durationSeconds: number; totalAmount: number }>();
+    (preview?.lines ?? []).forEach((line) => {
+      const total = totals.get(line.projectKey) ?? {
+        projectName: line.projectName,
+        durationSeconds: 0,
+        totalAmount: 0
+      };
+      total.durationSeconds += Number(line.durationSeconds);
+      total.totalAmount += Number(line.totalAmount);
+      totals.set(line.projectKey, total);
+    });
+    return Array.from(totals.entries()).map(([projectKey, total]) => ({
+      value: projectKey,
+      label: `${total.projectName} · ${this.durationLabel(total.durationSeconds)} · ${this.money(total.totalAmount)}`
+    }));
+  }
+
+  private uniqueProjectKeys(preview: InvoiceWorkPreview): string[] {
+    return Array.from(new Set(preview.lines.map((line) => line.projectKey)));
   }
 
   private currentMonthRange(): { startDate: string; endDate: string } {

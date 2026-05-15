@@ -185,17 +185,12 @@ form,
   gap: 16px;
 }
 
-.full-width {
-  grid-column: 1 / -1;
-}
-
 label {
   display: grid;
   gap: 7px;
 }
 
-input,
-select {
+input {
   width: 100%;
   min-height: 40px;
   border: 1px solid colors.$color-border-strong;
@@ -207,8 +202,7 @@ select {
   padding: 0 12px;
 }
 
-input:focus,
-select:focus {
+input:focus {
   border-color: colors.$color-accent;
   outline: 2px solid colors.$color-focus-ring;
 }
@@ -278,6 +272,16 @@ button.icon-button mat-icon {
 .entries-list {
   display: grid;
   gap: 10px;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 18px 0 6px;
+  border-top: 1px solid colors.$color-divider;
 }
 
 .day-entry-group,
@@ -432,10 +436,6 @@ button.icon-button mat-icon {
   grid-column: 1 / -1;
 }
 
-.wide {
-  grid-column: span 2;
-}
-
 .empty {
   padding: 18px 0;
   text-align: center;
@@ -480,15 +480,13 @@ button.icon-button mat-icon {
     border-left-color: colors.$color-dark-accent-strong;
   }
 
-  input,
-  select {
+  input {
     border-color: colors.$color-dark-border;
     background: colors.$color-dark-field;
     color: colors.$color-dark-text;
   }
 
-  input:focus,
-  select:focus {
+  input:focus {
     border-color: colors.$color-dark-accent-strong;
     outline-color: colors.$color-dark-focus-ring;
   }
@@ -505,12 +503,14 @@ button.icon-button mat-icon {
     color: colors.$color-dark-danger-text;
   }
 
-  .day-entry-summary,
-  .project-entry-summary,
-  .entry-row {
+  :is(.day-entry-summary, .project-entry-summary, .entry-row) {
     border-color: colors.$color-dark-border-muted;
     background: colors.$color-dark-surface-muted;
     color: colors.$color-dark-text;
+  }
+
+  .entry-row {
+    background: #1a1e1c;
   }
 
   .day-entry-summary {
@@ -558,6 +558,7 @@ button.icon-button mat-icon {
     justify-items: start;
     justify-content: flex-start;
   }
+
 }
 
 @media (max-width: 620px) {
@@ -594,7 +595,4 @@ button.icon-button mat-icon {
     gap: 3px;
   }
 
-  .wide {
-    grid-column: auto;
-  }
 }

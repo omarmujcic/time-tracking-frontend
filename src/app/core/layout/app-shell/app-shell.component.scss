@@ -51,6 +51,7 @@ nav {
 }
 
 .nav-item {
+  position: relative;
   min-height: 40px;
   display: flex;
   align-items: center;
@@ -61,6 +62,27 @@ nav {
   font-size: 0.93rem;
   font-weight: 700;
   text-decoration: none;
+}
+
+.nav-item span:not(.nav-badge) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-badge {
+  margin-left: auto;
+  min-width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: colors.$color-danger;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .nav-item mat-icon {
@@ -291,6 +313,10 @@ nav {
     color: colors.$color-dark-accent;
   }
 
+  .nav-badge {
+    color: colors.$color-dark-text-inverse;
+  }
+
   .sidebar-timer {
     border-color: colors.$color-dark-border;
     background: colors.$color-dark-surface-selected;
@@ -381,5 +407,11 @@ nav {
 
   .nav-item span:not(.brand-mark) {
     display: none;
+  }
+
+  .nav-badge {
+    position: absolute;
+    margin: -24px 0 0 22px;
+    display: inline-grid !important;
   }
 }

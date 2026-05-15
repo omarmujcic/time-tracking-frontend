@@ -1,13 +1,24 @@
-export interface TimerForm {
+export interface EntryDetailsForm {
   projectId: string;
   taskId: string;
   projectName: string;
   hourlyRate: number | null;
 }
 
-export interface ManualForm extends TimerForm {
-  startedAt: string;
-  endedAt: string;
+export type TimerForm = EntryDetailsForm;
+
+export interface ManualEntryTimeFields {
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+export type ManualForm = EntryDetailsForm & ManualEntryTimeFields;
+
+export interface EditTimeEntryForm extends EntryDetailsForm {
+  date: string;
+  startTime: string;
+  endTime: string;
 }
 
 export interface FiltersForm {

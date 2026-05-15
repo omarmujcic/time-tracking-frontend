@@ -24,6 +24,15 @@ export interface TimeEntrySummary {
   hasActiveTimer: boolean;
 }
 
+export interface TimeEntryPage {
+  entries: TimeEntry[];
+  pageSize: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+  nextCursor: string | null;
+  previousCursor: string | null;
+}
+
 export interface StartTimerRequest {
   projectId?: string | null;
   taskId?: string | null;
@@ -54,4 +63,7 @@ export interface TimeEntryFilters {
   userId?: string;
   projectNames?: string[];
   userIds?: string[];
+  timezone?: string;
+  cursor?: string;
+  pageSize?: number;
 }

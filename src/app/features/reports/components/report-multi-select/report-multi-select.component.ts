@@ -1,6 +1,7 @@
-import { Component, ElementRef, EventEmitter, HostListener, Input, Output, signal } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, Output, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { FieldOverlayCoordinatorService } from '../../../../shared/ui/field-overlay-coordinator.service';
 import { ReportMultiSelectOption } from './report-multi-select.model';
 
 @Component({
@@ -20,7 +21,8 @@ export class ReportMultiSelectComponent {
   @Output() readonly selectedValuesChange = new EventEmitter<string[]>();
   @Output() readonly createOption = new EventEmitter<string>();
 
-  protected readonly open = signal(false);
+  private readonly overlayId = Symbol('report-multi-select');
+  protected readonly open = computed(() => this.fieldOverlayCoordinator.isOpen(this.overlayId));
   protected readonly creating = signal(false);
   protected createValue = '';
   protected get sortedOptions(): ReportMultiSelectOption[] {
@@ -46,30 +48,37 @@ export class ReportMultiSelectComponent {
     return labels.join(', ');
   }
 
-  constructor(private readonly elementRef: ElementRef<HTMLElement>) {}
+  constructor(
+    private readonly elementRef: ElementRef<HTMLElement>,
+    private readonly fieldOverlayCoordinator: FieldOverlayCoordinatorService
+  ) {
+    effect(() => {
+      if (!this.open()) {
+        queueMicrotask(() => this.resetCreateState());
+      }
+    });
+  }
 
   @HostListener('document:click', ['$event'])
   protected closeOnOutsideClick(event: MouseEvent): void {
     if (!this.elementRef.nativeElement.contains(event.target as Node)) {
-      this.open.set(false);
-      this.creating.set(false);
+      this.closeSelect();
     }
   }
 
-  protected toggleOpen(): void {
-    this.open.update((open) => !open);
+  protected toggleOpen(event: MouseEvent): void {
+    event.stopPropagation();
     if (this.open()) {
+      this.closeSelect();
       return;
     }
-    this.creating.set(false);
-    this.createValue = '';
+    this.fieldOverlayCoordinator.open(this.overlayId);
   }
 
   protected toggleValue(value: string): void {
     if (!this.multiple) {
       this.selectedValuesChange.emit([value]);
-      this.open.set(false);
-      this.creating.set(false);
+      this.closeSelect();
       return;
     }
 
@@ -80,6 +89,7 @@ export class ReportMultiSelectComponent {
       selected.add(value);
     }
     this.selectedValuesChange.emit([...selected]);
+    this.closeSelect();
   }
 
   protected isSelected(value: string): boolean {
@@ -103,12 +113,20 @@ export class ReportMultiSelectComponent {
       return;
     }
     this.createOption.emit(value);
-    this.creating.set(false);
-    this.createValue = '';
-    this.open.set(false);
+    this.closeSelect();
   }
 
   private selectedSet(): Set<string> {
     return new Set(this.selectedValues);
+  }
+
+  private closeSelect(): void {
+    this.fieldOverlayCoordinator.close(this.overlayId);
+    this.resetCreateState();
+  }
+
+  private resetCreateState(): void {
+    this.creating.set(false);
+    this.createValue = '';
   }
 }

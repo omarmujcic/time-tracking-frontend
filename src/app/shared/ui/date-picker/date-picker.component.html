@@ -1,6 +1,6 @@
 <button class="picker-button" type="button" [disabled]="disabled" (click)="toggle($event)">
   <span [class.placeholder]="!valueState()">{{ displayValue() }}</span>
-  <mat-icon aria-hidden="true">{{ mode === 'month' ? 'calendar_month' : 'event' }}</mat-icon>
+  <mat-icon aria-hidden="true">{{ mode === 'month' || mode === 'year' ? 'calendar_month' : 'event' }}</mat-icon>
 </button>
 
 @if (open()) {
@@ -23,18 +23,29 @@
           </button>
         }
       </div>
+    } @else if (mode === 'year') {
+      <div class="year-grid">
+        @for (year of years(); track year) {
+          <button type="button" [class.selected]="isSelectedYear(year)" (click)="selectYear(year)">
+            {{ year }}
+          </button>
+        }
+      </div>
     } @else {
       <div class="weekday-grid">
         @for (day of weekDays; track day) {
           <span>{{ day }}</span>
         }
       </div>
-      <div class="day-grid">
+      <div class="day-grid" (mouseleave)="clearHover()">
         @for (day of calendarDays(); track day.date.toISOString()) {
           <button
             type="button"
             [class.outside]="day.outside"
             [class.selected]="day.selected"
+            [class.week-selected]="day.weekSelected"
+            [class.week-hovered]="day.weekHovered"
+            (mouseenter)="hoverDay(day)"
             (click)="selectDay(day)"
           >
             {{ day.label }}

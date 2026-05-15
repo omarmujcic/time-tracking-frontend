@@ -73,7 +73,8 @@
 
 .picker-header button,
 .day-grid button,
-.month-grid button {
+.month-grid button,
+.year-grid button {
   min-height: 32px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -115,6 +116,7 @@
 
 .day-grid button:hover,
 .month-grid button:hover,
+.year-grid button:hover,
 .picker-header button:hover {
   background: colors.$color-accent-hover;
   color: colors.$color-accent;
@@ -125,13 +127,20 @@
 }
 
 .day-grid button.selected,
-.month-grid button.selected {
+.month-grid button.selected,
+.year-grid button.selected {
   border-color: colors.$color-accent;
   background: colors.$color-accent;
   color: colors.$color-surface;
 }
 
-.month-grid {
+.day-grid button:is(.week-selected, .week-hovered):not(.selected) {
+  background: colors.$color-accent-hover;
+  color: colors.$color-accent;
+}
+
+.month-grid,
+.year-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
@@ -183,7 +192,8 @@
   .picker-button mat-icon,
   .picker-header button,
   .day-grid button,
-  .month-grid button {
+  .month-grid button,
+  .year-grid button {
     color: #d7d2c9;
   }
 
@@ -204,16 +214,23 @@
 
   .day-grid button:hover,
   .month-grid button:hover,
+  .year-grid button:hover,
   .picker-header button:hover {
     background: #23352f;
     color: #9ed7c6;
   }
 
   .day-grid button.selected,
-  .month-grid button.selected {
+  .month-grid button.selected,
+  .year-grid button.selected {
     border-color: #1f7d68;
     background: #1f7d68;
     color: #f5f1ea;
+  }
+
+  .day-grid button:is(.week-selected, .week-hovered):not(.selected) {
+    background: #23352f;
+    color: #9ed7c6;
   }
 
   .time-grid {

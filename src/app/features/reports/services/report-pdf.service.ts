@@ -3,10 +3,10 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatUserCurrency, formatUserDate, formatUserDateTime } from '../../../shared/utils/user-formatting';
 import { UserPreference } from '../../settings/models/settings.model';
+import { noTaskChartColor, projectChartColors } from '../models/report-chart-colors.model';
 import { ReportBucketSegment, ReportEntry, ReportEntryGroup, ReportFilters, TimeReport } from '../models/report.model';
 
 const noTaskSegmentKey = '__NO_TASK__';
-const taskChartColors = ['#8b5cf6', '#c17f13', '#2f6fed', '#14b8a6', '#db2777', '#65a30d', '#dc2626', '#0891b2'];
 
 @Injectable({ providedIn: 'root' })
 export class ReportPdfService {
@@ -325,9 +325,9 @@ export class ReportPdfService {
 
   private taskColor(key: string, index: number): string {
     if (key === noTaskSegmentKey) {
-      return '#6b7280';
+      return noTaskChartColor;
     }
-    return taskChartColors[index % taskChartColors.length];
+    return projectChartColors[index % projectChartColors.length];
   }
 
   private pageWidth(doc: jsPDF): number {
