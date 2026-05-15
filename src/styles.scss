@@ -1,3 +1,5 @@
+@use './styles/colors' as colors;
+
 * {
   box-sizing: border-box;
 }
@@ -15,6 +17,20 @@ body {
 
 :root[data-theme="dark"] body {
   background: #181b19;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.field > span {
+  color: colors.$color-muted;
+  font-size: 0.82rem;
+}
+
+:root[data-theme="dark"] .field > span {
+  color: colors.$color-dark-muted;
 }
 
 .material-icons,

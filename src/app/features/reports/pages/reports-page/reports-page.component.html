@@ -56,26 +56,51 @@
       }
     </div>
     <div class="filters-grid">
-      <label>
-        <span>{{ translationPath + 'filters.startDate' | translate }}</span>
-        <app-date-picker
-          mode="date"
-          [dateFormat]="preferences().dateFormat"
-          [placeholder]="translationPath + 'filters.startDate' | translate"
-          [value]="filters.startDate"
-          (valueChange)="filters.startDate = $event"
-        />
-      </label>
-      <label>
-        <span>{{ translationPath + 'filters.endDate' | translate }}</span>
-        <app-date-picker
-          mode="date"
-          [dateFormat]="preferences().dateFormat"
-          [placeholder]="translationPath + 'filters.endDate' | translate"
-          [value]="filters.endDate"
-          (valueChange)="filters.endDate = $event"
-        />
-      </label>
+      @if (filters.view === 'CUSTOM') {
+        <div class="field">
+          <span>{{ translationPath + 'filters.startDate' | translate }}</span>
+          <app-date-picker
+            mode="date"
+            [dateFormat]="preferences().dateFormat"
+            [placeholder]="translationPath + 'filters.startDate' | translate"
+            [value]="filters.startDate"
+            (valueChange)="filters.startDate = $event"
+          />
+        </div>
+        <div class="field">
+          <span>{{ translationPath + 'filters.endDate' | translate }}</span>
+          <app-date-picker
+            mode="date"
+            [dateFormat]="preferences().dateFormat"
+            [placeholder]="translationPath + 'filters.endDate' | translate"
+            [value]="filters.endDate"
+            (valueChange)="filters.endDate = $event"
+          />
+        </div>
+      } @else {
+        <div class="field">
+          <span>{{ periodFilterLabel() }}</span>
+          <app-date-picker
+            [mode]="periodPickerMode()"
+            [dateFormat]="preferences().dateFormat"
+            [placeholder]="periodFilterLabel()"
+            [value]="periodValue()"
+            (valueChange)="updatePeriod($event)"
+          />
+        </div>
+      }
+      @if (canIncludeOrganizationEntries()) {
+        <div style="min-height: 40px; display: flex; align-items: center; gap: 10px; padding-top: 24px; font-size: 0.82rem;">
+          <input
+            type="checkbox"
+            name="includeOrganizationEntries"
+            [ngModel]="filters.includeOrganizationEntries"
+            (ngModelChange)="updateIncludeOrganizationEntries($event)"
+            style="width: 18px; min-height: 18px; margin: 0; padding: 0; accent-color: #176b5d;"
+          />
+          <span style="opacity: 0.72;">{{ translationPath + 'filters.includeOrganizationEntries' | translate }}</span>
+        </div>
+      }
       <app-report-multi-select
         [label]="translationPath + 'filters.users' | translate"
         [placeholder]="translationPath + 'filters.allUsers' | translate"
@@ -188,7 +213,7 @@
                 </div>
               }
             } @else {
-              @for (project of currentReport.projects; track project.projectName) {
+              @for (project of visibleProjects(); track project.projectName) {
                 <div class="project-row">
                   <div>
                     <strong>{{ project.projectName }}</strong>
@@ -196,11 +221,21 @@
                   </div>
                   <div class="project-share">
                     <span>{{ project.percentage }}%</span>
-                    <div><i [style.width.%]="project.percentage"></i></div>
+                    <div><i [style.width.%]="project.percentage" [style.background]="projectColor(project.projectName)"></i></div>
                   </div>
                 </div>
               } @empty {
                 <p class="empty">{{ translationPath + 'projects.empty' | translate }}</p>
+              }
+              @if (currentReport.projects.length > 3) {
+                <div class="task-pager">
+                  <button type="button" class="secondary" [disabled]="projectBreakdownStart() === 0" aria-label="Previous project" (click)="moveProjectBreakdown(-1)">
+                    <mat-icon aria-hidden="true">keyboard_arrow_up</mat-icon>
+                  </button>
+                  <button type="button" class="secondary" [disabled]="projectBreakdownStart() >= maxProjectBreakdownStart()" aria-label="Next project" (click)="moveProjectBreakdown(1)">
+                    <mat-icon aria-hidden="true">keyboard_arrow_down</mat-icon>
+                  </button>
+                </div>
               }
             }
           </div>
@@ -225,7 +260,7 @@
                 <span>{{ money(group.totalAmount) }}</span>
               </button>
               @if (isProjectExpanded(group.projectName)) {
-                <div class="entry-table">
+                <div class="entry-table grouped-entry-table">
                   <div class="entry-head">
                     <span>{{ translationPath + 'entry.user' | translate }}</span>
                     <span>{{ translationPath + 'entry.task' | translate }}</span>
@@ -257,7 +292,7 @@
         } @else {
           @if (report(); as currentReport) {
             @if (currentReport.entries.length) {
-              <div class="entry-table">
+              <div class="entry-table flat-entry-table">
                 <div class="entry-head">
                   <span>{{ translationPath + 'entry.user' | translate }}</span>
                   <span>{{ translationPath + 'entry.project' | translate }}</span>
@@ -293,7 +328,7 @@
         @for (group of groupedEntries(); track group.key) {
           <article class="entry-group">
             <h3>{{ group.label }}</h3>
-            <div class="entry-table">
+            <div class="entry-table flat-entry-table">
               <div class="entry-head">
                 <span>{{ translationPath + 'entry.user' | translate }}</span>
                 <span>{{ translationPath + 'entry.project' | translate }}</span>

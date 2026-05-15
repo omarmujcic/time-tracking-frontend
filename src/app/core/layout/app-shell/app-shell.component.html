@@ -21,6 +21,9 @@
           >
             <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
             <span>{{ item.labelKey | translate }}</span>
+            @if (item.path === '/notifications' && notificationOpenCount() > 0) {
+              <span class="nav-badge">{{ notificationOpenCount() > 99 ? '99+' : notificationOpenCount() }}</span>
+            }
           </a>
         }
       }

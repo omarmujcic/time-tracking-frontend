@@ -10,6 +10,7 @@ import { WorkspaceStateFacade } from '../../../../shared/state/workspace/workspa
 import { ConfirmationDialogService } from '../../../../shared/ui/confirm-dialog/confirm-dialog.service';
 import { DatePickerComponent } from '../../../../shared/ui/date-picker/date-picker.component';
 import { NotificationToastService } from '../../../../shared/ui/notification-toast/notification-toast.service';
+import { TimePickerComponent } from '../../../../shared/ui/time-picker/time-picker.component';
 import { httpErrorMessage } from '../../../../shared/utils/http-error-message';
 import {
   formatUserCurrency,
@@ -18,6 +19,12 @@ import {
   formatUserRateInput,
   parseUserDecimal
 } from '../../../../shared/utils/user-formatting';
+import {
+  dateWithInputTime,
+  inputDateTimeRange,
+  toInputDate,
+  toInputTime
+} from '../../../../shared/utils/input-date-time';
 import { PreferenceService } from '../../../settings/services/preference.service';
 import { OrganizationMember, ProjectTask, UserPreference } from '../../../settings/models/settings.model';
 import { ProjectService } from '../../../settings/services/project.service';
@@ -28,10 +35,19 @@ import {
   CreateTimeEntryRequest,
   TimeEntry,
   TimeEntryFilters,
+  TimeEntryPage,
+  TimeEntrySummary,
   UpdateTimeEntryRequest
 } from '../../models/time-entry.model';
 import { DayEntryGroup, ProjectEntryGroup } from '../../models/entry-group.model';
-import { FiltersForm, ManualForm, TimerForm } from '../../models/dashboard-form.model';
+import {
+  EditTimeEntryForm,
+  EntryDetailsForm,
+  FiltersForm,
+  ManualEntryTimeFields,
+  ManualForm,
+  TimerForm
+} from '../../models/dashboard-form.model';
 import { TimeEntryService } from '../../services/time-entry.service';
 
 const emptyTimerForm: TimerForm = {
@@ -41,10 +57,19 @@ const emptyTimerForm: TimerForm = {
   hourlyRate: null
 };
 
+const emptySummary: TimeEntrySummary = {
+  totalSeconds: 0,
+  totalAmount: 0,
+  currency: 'EUR',
+  entryCount: 0,
+  hasActiveTimer: false
+};
+
 const defaultPreference: UserPreference = {
   language: 'en',
   themeMode: 'SYSTEM',
   groupedEntriesEnabled: true,
+  includeOrganizationEntriesInPersonalReports: true,
   dateFormat: 'YYYY-MM-DD',
   decimalSeparator: 'DOT',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -58,6 +83,7 @@ const defaultPreference: UserPreference = {
     NgTemplateOutlet,
     DatePickerComponent,
     ReportMultiSelectComponent,
+    TimePickerComponent,
     TranslatePipe
   ],
   templateUrl: './dashboard-page.component.html',
@@ -66,6 +92,8 @@ const defaultPreference: UserPreference = {
 export class DashboardPageComponent implements OnDestroy {
   protected readonly translationPath = 'features.dashboard.';
   protected readonly entries = signal<TimeEntry[]>([]);
+  protected readonly entryPage = signal<TimeEntryPage | null>(null);
+  protected readonly summary = signal<TimeEntrySummary>({ ...emptySummary });
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
   protected readonly timerError = signal<string | null>(null);
@@ -80,26 +108,34 @@ export class DashboardPageComponent implements OnDestroy {
   protected readonly expandedProjects = signal<Set<string>>(new Set());
   protected readonly preferences = signal<UserPreference>({ ...defaultPreference });
   protected readonly organizationMembers = signal<OrganizationMember[]>([]);
+  protected readonly pageNumber = signal(1);
+  protected readonly hasPreviousPage = signal(false);
   protected readonly user;
   protected readonly projects;
 
+  private readonly manualEntryTimeFieldsSessionKey = 'dashboard.manualEntry.timeFields.v1';
   protected timerForm: TimerForm = { ...emptyTimerForm };
   protected manualForm: ManualForm = this.defaultManualForm();
   protected filters: FiltersForm;
   protected editingEntryId = signal<string | null>(null);
-  protected editForm: ManualForm = this.defaultManualForm();
+  protected editForm: EditTimeEntryForm = this.defaultEditForm();
 
   protected readonly sortedEntries = computed(() => this.sortEntries(this.entries()));
   protected readonly activeEntry = computed(() => this.sortedEntries().find((entry) => entry.active) ?? null);
   protected readonly completedEntries = computed(() => this.sortedEntries().filter((entry) => !entry.active));
   protected readonly dayEntryGroups = computed(() => this.entryGroupsByDay(this.entries()));
-  protected readonly totalSeconds = computed(() =>
-    this.entries().reduce((totalSeconds, entry) => totalSeconds + this.liveDuration(entry), 0)
-  );
-  protected readonly totalAmount = computed(() =>
-    this.entries().reduce((totalAmount, entry) => totalAmount + this.amountFor(entry), 0)
-  );
-  protected readonly entryCount = computed(() => this.entries().length);
+  protected readonly totalSeconds = computed(() => this.summary().totalSeconds + this.activeSummaryElapsedSeconds());
+  protected readonly totalAmount = computed(() => {
+    const summary = this.summary();
+    const activeEntry = this.activeTimer.activeEntry();
+    if (!summary.hasActiveTimer || !activeEntry) {
+      return summary.totalAmount;
+    }
+    return summary.totalAmount + Number(activeEntry.hourlyRate) * (this.activeSummaryElapsedSeconds() / 3600);
+  });
+  protected readonly entryCount = computed(() => this.summary().entryCount);
+  protected readonly shownEntryCount = computed(() => this.entries().length);
+  protected readonly hasNextPage = computed(() => this.entryPage()?.hasNext ?? false);
   protected readonly activeProjectOptions = computed<ReportMultiSelectOption[]>(() =>
     this.projects()
       .filter((project) => project.status === 'ACTIVE')
@@ -130,6 +166,10 @@ export class DashboardPageComponent implements OnDestroy {
   );
 
   private readonly timer = window.setInterval(() => this.currentTime.set(new Date()), 1000);
+  private readonly pageSize = 100;
+  private readonly summaryLoadedAt = signal<Date | null>(null);
+  private readonly cursorHistory: (string | null)[] = [];
+  private currentCursor: string | null = null;
   private currentWorkspaceKey = '';
 
   constructor(
@@ -147,12 +187,7 @@ export class DashboardPageComponent implements OnDestroy {
   ) {
     this.user = this.authState.user;
     this.projects = this.workspaceState.projects;
-    this.filters = {
-      month: this.currentMonth(),
-      day: '',
-      projectNames: [],
-      userIds: []
-    };
+    this.filters = this.defaultFilters();
     this.timerDetailsEditorOpen.set(this.route.snapshot.queryParamMap.get('editTimer') === 'true');
     this.loadDashboard();
     this.workspaceState.load();
@@ -160,7 +195,8 @@ export class DashboardPageComponent implements OnDestroy {
       .then((preferences) => {
         this.preferences.set(preferences);
         this.groupedEntriesEnabled.set(preferences.groupedEntriesEnabled);
-        this.expandEntryGroups();
+        this.resetPagination();
+        void this.loadDashboard(null);
       })
       .catch(() => undefined);
     effect(() => {
@@ -179,23 +215,30 @@ export class DashboardPageComponent implements OnDestroy {
     window.clearInterval(this.timer);
   }
 
-  protected async loadDashboard(): Promise<void> {
+  protected async loadDashboard(cursor: string | null = this.currentCursor): Promise<boolean> {
     this.loading.set(true);
     this.loadError.set(null);
     try {
       const filters = this.requestFilters();
-      const [entries, , activeEntry] = await Promise.all([
-        this.timeEntryService.list(filters),
+      const [page, summary, , activeEntry] = await Promise.all([
+        this.timeEntryService.list(this.requestPageFilters(filters, cursor)),
+        this.timeEntryService.summary(filters),
         this.loadOrganizationMembers(),
         this.activeTimer.loadActive()
       ]);
-      this.entries.set(entries);
+      this.entries.set(page.entries);
+      this.entryPage.set(page);
+      this.summary.set(summary);
+      this.summaryLoadedAt.set(new Date());
+      this.currentCursor = cursor;
       this.syncTimerForm(activeEntry);
       this.expandEntryGroups();
+      return true;
     } catch (error) {
       const message = httpErrorMessage(error, this.translation('error.load'));
       this.loadError.set(message);
       this.notifications.error(message, 'Could not load dashboard');
+      return false;
     } finally {
       this.loading.set(false);
     }
@@ -303,23 +346,40 @@ export class DashboardPageComponent implements OnDestroy {
     if (!request) {
       return;
     }
-
-    await this.runAction(this.manualEntryError, async () => {
-      await this.timeEntryService.create(request);
+    const created = await this.runAction(this.manualEntryError, () => this.timeEntryService.create(request), 'Time entry added.');
+    if (created) {
       this.manualForm = this.defaultManualForm();
-    }, 'Time entry added.');
+    }
+  }
+
+  protected updateManualDate(value: string): void {
+    this.manualForm.date = value;
+    this.persistManualEntryTimeFields();
+  }
+
+  protected updateManualStartTime(value: string): void {
+    this.manualForm.startTime = value;
+    this.persistManualEntryTimeFields();
+  }
+
+  protected updateManualEndTime(value: string): void {
+    this.manualForm.endTime = value;
+    this.persistManualEntryTimeFields();
   }
 
   protected startEdit(entry: TimeEntry): void {
     this.entriesError.set(null);
+    const startedAt = new Date(entry.startedAt);
+    const endedAt = entry.endedAt ? new Date(entry.endedAt) : null;
     this.editingEntryId.set(entry.id);
     this.editForm = {
       projectName: entry.projectName,
       projectId: entry.projectId ?? '',
       taskId: entry.taskId ?? '',
       hourlyRate: Number(entry.hourlyRate),
-      startedAt: this.toInputDateTime(entry.startedAt),
-      endedAt: entry.endedAt ? this.toInputDateTime(entry.endedAt) : ''
+      date: toInputDate(startedAt),
+      startTime: toInputTime(startedAt),
+      endTime: endedAt ? toInputTime(endedAt) : ''
     };
   }
 
@@ -356,21 +416,52 @@ export class DashboardPageComponent implements OnDestroy {
 
   protected applyFilters(): void {
     this.filtersError.set(null);
-    this.loadDashboard();
+    this.resetPagination();
+    this.loadDashboard(null);
   }
 
   protected clearFilters(): void {
     this.filtersError.set(null);
-    this.filters = {
-      month: this.currentMonth(),
-      day: '',
-      projectNames: [],
-      userIds: []
-    };
-    this.loadDashboard();
+    this.filters = this.defaultFilters();
+    this.resetPagination();
+    this.loadDashboard(null);
   }
 
-  protected onProjectSelected(form: TimerForm): void {
+  protected async nextPage(): Promise<void> {
+    const nextCursor = this.entryPage()?.nextCursor;
+    if (!nextCursor) {
+      return;
+    }
+    const previousCursor = this.currentCursor;
+    const previousPageNumber = this.pageNumber();
+    this.cursorHistory.push(previousCursor);
+    this.hasPreviousPage.set(true);
+    this.pageNumber.set(previousPageNumber + 1);
+    const loaded = await this.loadDashboard(nextCursor);
+    if (!loaded) {
+      this.cursorHistory.pop();
+      this.hasPreviousPage.set(this.cursorHistory.length > 0);
+      this.pageNumber.set(previousPageNumber);
+    }
+  }
+
+  protected async previousPage(): Promise<void> {
+    const targetCursor = this.cursorHistory.pop();
+    if (targetCursor === undefined) {
+      return;
+    }
+    const previousPageNumber = this.pageNumber();
+    this.hasPreviousPage.set(this.cursorHistory.length > 0);
+    this.pageNumber.set(Math.max(1, previousPageNumber - 1));
+    const loaded = await this.loadDashboard(targetCursor);
+    if (!loaded) {
+      this.cursorHistory.push(targetCursor);
+      this.hasPreviousPage.set(true);
+      this.pageNumber.set(previousPageNumber);
+    }
+  }
+
+  protected onProjectSelected(form: EntryDetailsForm): void {
     const project = this.projects().find((option) => option.id === form.projectId);
     form.projectName = project?.name ?? '';
     form.taskId = '';
@@ -394,12 +485,12 @@ export class DashboardPageComponent implements OnDestroy {
     return value ? [value] : [];
   }
 
-  protected onProjectValuesSelected(form: TimerForm, values: string[]): void {
+  protected onProjectValuesSelected(form: EntryDetailsForm, values: string[]): void {
     form.projectId = values[0] ?? '';
     this.onProjectSelected(form);
   }
 
-  protected onTaskValuesSelected(form: TimerForm, values: string[]): void {
+  protected onTaskValuesSelected(form: EntryDetailsForm, values: string[]): void {
     form.taskId = values[0] ?? '';
     this.syncActiveTimerDetails(form);
   }
@@ -449,6 +540,19 @@ export class DashboardPageComponent implements OnDestroy {
     return this.expandedDays().has(dayKey);
   }
 
+  protected expandAllEntryGroups(): void {
+    const dayGroups = this.dayEntryGroups();
+    this.expandedDays.set(new Set(dayGroups.map((dayGroup) => dayGroup.key)));
+    this.expandedProjects.set(new Set(dayGroups.flatMap((dayGroup) =>
+      dayGroup.projects.map((projectGroup) => projectGroup.key)
+    )));
+  }
+
+  protected minimizeAllEntryGroups(): void {
+    this.expandedDays.set(new Set());
+    this.expandedProjects.set(new Set());
+  }
+
   protected toggleProject(dayKey: string, projectName: string): void {
     const key = this.projectExpansionKey(dayKey, projectName);
     const expanded = new Set(this.expandedProjects());
@@ -493,7 +597,7 @@ export class DashboardPageComponent implements OnDestroy {
     return formatUserRateInput(value, this.preferences());
   }
 
-  protected updateRate(form: TimerForm, value: string): void {
+  protected updateRate(form: EntryDetailsForm, value: string): void {
     form.hourlyRate = parseUserDecimal(value, this.preferences().decimalSeparator);
     this.syncActiveTimerDetails(form);
   }
@@ -527,8 +631,13 @@ export class DashboardPageComponent implements OnDestroy {
   }
 
   private manualRequest(): CreateTimeEntryRequest | null {
-    if (!this.manualForm.projectId || !this.manualForm.hourlyRate || !this.manualForm.startedAt || !this.manualForm.endedAt) {
+    if (!this.manualForm.projectId || !this.manualForm.hourlyRate || !this.manualForm.date || !this.manualForm.startTime || !this.manualForm.endTime) {
       this.showFormError(this.manualEntryError, this.translation('error.manualRequired'));
+      return null;
+    }
+    const range = inputDateTimeRange(this.manualForm.date, this.manualForm.startTime, this.manualForm.endTime);
+    if (!range) {
+      this.showFormError(this.manualEntryError, this.translation('error.manualRangeInvalid'));
       return null;
     }
 
@@ -537,18 +646,28 @@ export class DashboardPageComponent implements OnDestroy {
       taskId: this.manualForm.taskId || null,
       projectName: this.manualForm.projectName,
       hourlyRate: this.manualForm.hourlyRate,
-      startedAt: this.toIsoDateTime(this.manualForm.startedAt),
-      endedAt: this.toIsoDateTime(this.manualForm.endedAt)
+      startedAt: range.startedAt.toISOString(),
+      endedAt: range.endedAt.toISOString()
     };
   }
 
   private updateRequest(isActive: boolean): UpdateTimeEntryRequest | null {
-    if (!this.editForm.projectId || !this.editForm.hourlyRate || !this.editForm.startedAt) {
+    if (!this.editForm.projectId || !this.editForm.hourlyRate || !this.editForm.date || !this.editForm.startTime) {
       this.showFormError(this.entriesError, this.translation('error.editRequired'));
       return null;
     }
-    if (!isActive && !this.editForm.endedAt) {
+    if (!isActive && !this.editForm.endTime) {
       this.showFormError(this.entriesError, this.translation('error.editEndRequired'));
+      return null;
+    }
+    const startedAt = dateWithInputTime(this.editForm.date, this.editForm.startTime);
+    if (!startedAt || Number.isNaN(startedAt.getTime())) {
+      this.showFormError(this.entriesError, this.translation('error.editRequired'));
+      return null;
+    }
+    const range = isActive ? null : inputDateTimeRange(this.editForm.date, this.editForm.startTime, this.editForm.endTime);
+    if (!isActive && !range) {
+      this.showFormError(this.entriesError, this.translation('error.manualRangeInvalid'));
       return null;
     }
 
@@ -557,8 +676,8 @@ export class DashboardPageComponent implements OnDestroy {
       taskId: this.editForm.taskId || null,
       projectName: this.editForm.projectName,
       hourlyRate: this.editForm.hourlyRate,
-      startedAt: this.toIsoDateTime(this.editForm.startedAt),
-      endedAt: this.editForm.endedAt ? this.toIsoDateTime(this.editForm.endedAt) : null
+      startedAt: (range?.startedAt ?? startedAt).toISOString(),
+      endedAt: range?.endedAt.toISOString() ?? null
     };
   }
 
@@ -567,7 +686,16 @@ export class DashboardPageComponent implements OnDestroy {
       month: this.filters.day ? undefined : this.filters.month || undefined,
       day: this.filters.day || undefined,
       projectNames: this.filters.projectNames,
-      userIds: this.filters.userIds
+      userIds: this.filters.userIds,
+      timezone: this.preferences().timezone || undefined
+    };
+  }
+
+  private requestPageFilters(filters: TimeEntryFilters, cursor: string | null): TimeEntryFilters {
+    return {
+      ...filters,
+      cursor: cursor || undefined,
+      pageSize: this.pageSize
     };
   }
 
@@ -631,19 +759,18 @@ export class DashboardPageComponent implements OnDestroy {
       return;
     }
     const dayGroups = this.entryGroupsByDay(this.entries());
-    this.expandedDays.set(new Set(dayGroups.map((group) => group.key)));
-    this.expandedProjects.set(new Set(
-      dayGroups.flatMap((dayGroup) => dayGroup.projects.map((projectGroup) => projectGroup.key))
-    ));
+    const newestDayGroup = dayGroups[0];
+    this.expandedDays.set(new Set(newestDayGroup ? [newestDayGroup.key] : []));
+    this.expandedProjects.set(new Set(newestDayGroup?.projects.map((projectGroup) => projectGroup.key) ?? []));
   }
 
   private resetWorkspaceForms(): void {
     this.timerForm = { ...emptyTimerForm };
     this.manualForm = this.defaultManualForm();
-    this.editForm = this.defaultManualForm();
+    this.editForm = this.defaultEditForm();
     this.editingEntryId.set(null);
-    this.filters.projectNames = [];
-    this.filters.userIds = [];
+    this.filters = this.defaultFilters();
+    this.resetPagination();
   }
 
   private syncTimerForm(entry: TimeEntry | null): void {
@@ -658,7 +785,7 @@ export class DashboardPageComponent implements OnDestroy {
     };
   }
 
-  private syncActiveTimerDetails(form: TimerForm, createdTask?: ProjectTask): void {
+  private syncActiveTimerDetails(form: EntryDetailsForm, createdTask?: ProjectTask): void {
     if (form !== this.timerForm || !this.activeTimer.activeEntry()) {
       return;
     }
@@ -702,39 +829,106 @@ export class DashboardPageComponent implements OnDestroy {
   }
 
   private defaultManualForm(): ManualForm {
+    return {
+      projectName: '',
+      projectId: '',
+      taskId: '',
+      hourlyRate: null,
+      ...this.manualEntryTimeFields()
+    };
+  }
+
+  private manualEntryTimeFields(): ManualEntryTimeFields {
+    return this.savedManualEntryTimeFields() ?? this.defaultManualEntryTimeFields();
+  }
+
+  private defaultManualEntryTimeFields(): ManualEntryTimeFields {
+    return {
+      date: toInputDate(new Date()),
+      startTime: '09:00',
+      endTime: '17:00'
+    };
+  }
+
+  private persistManualEntryTimeFields(): void {
+    sessionStorage.setItem(this.manualEntryTimeFieldsSessionKey, JSON.stringify({
+      date: this.manualForm.date,
+      startTime: this.manualForm.startTime,
+      endTime: this.manualForm.endTime
+    }));
+  }
+
+  private savedManualEntryTimeFields(): ManualEntryTimeFields | null {
+    try {
+      const value = sessionStorage.getItem(this.manualEntryTimeFieldsSessionKey);
+      if (!value) {
+        return null;
+      }
+      const fields = JSON.parse(value) as Partial<ManualEntryTimeFields>;
+      if (this.isManualEntryTimeFields(fields)) {
+        return fields;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  private isManualEntryTimeFields(fields: Partial<ManualEntryTimeFields>): fields is ManualEntryTimeFields {
+    return this.isInputDate(fields.date) && this.isInputTime(fields.startTime) && this.isInputTime(fields.endTime);
+  }
+
+  private isInputDate(value: unknown): value is string {
+    return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  }
+
+  private isInputTime(value: unknown): value is string {
+    return typeof value === 'string' && /^\d{2}:\d{2}$/.test(value);
+  }
+
+  private defaultEditForm(): EditTimeEntryForm {
     const now = new Date();
-    const end = new Date(now.getTime());
     const start = new Date(now.getTime() - 60 * 60 * 1000);
     return {
       projectName: '',
       projectId: '',
       taskId: '',
       hourlyRate: null,
-      startedAt: this.toInputDateTime(start.toISOString()),
-      endedAt: this.toInputDateTime(end.toISOString())
+      date: toInputDate(start),
+      startTime: toInputTime(start),
+      endTime: toInputTime(now)
     };
   }
 
-  private currentMonth(): string {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  private defaultFilters(): FiltersForm {
+    return {
+      month: '',
+      day: '',
+      projectNames: [],
+      userIds: []
+    };
   }
 
-  private toIsoDateTime(value: string): string {
-    return new Date(value).toISOString();
+  private resetPagination(): void {
+    this.cursorHistory.splice(0);
+    this.currentCursor = null;
+    this.pageNumber.set(1);
+    this.hasPreviousPage.set(false);
   }
 
-  private toInputDateTime(value: string): string {
-    const date = new Date(value);
-    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-    return date.toISOString().slice(0, 19);
+  private activeSummaryElapsedSeconds(): number {
+    const summaryLoadedAt = this.summaryLoadedAt();
+    if (!this.summary().hasActiveTimer || !summaryLoadedAt) {
+      return 0;
+    }
+    return Math.max(0, Math.floor((this.currentTime().getTime() - summaryLoadedAt.getTime()) / 1000));
   }
 
   private translation(key: string, params: Record<string, string> = {}): string {
     return this.translateService.instant(`${this.translationPath}${key}`, params);
   }
 
-  private formForTarget(target: 'timer' | 'manual' | 'edit'): TimerForm {
+  private formForTarget(target: 'timer' | 'manual' | 'edit'): EntryDetailsForm {
     if (target === 'timer') {
       return this.timerForm;
     }

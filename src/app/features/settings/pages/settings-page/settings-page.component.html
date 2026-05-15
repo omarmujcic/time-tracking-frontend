@@ -126,6 +126,14 @@
           <input name="groupedEntriesEnabled" type="checkbox" [(ngModel)]="preferences.groupedEntriesEnabled" />
           <span>Group time entries by default</span>
         </label>
+        <label class="toggle-row">
+          <input
+            name="includeOrganizationEntriesInPersonalReports"
+            type="checkbox"
+            [(ngModel)]="preferences.includeOrganizationEntriesInPersonalReports"
+          />
+          <span>Allow organization entries in personal reports</span>
+        </label>
         <button type="submit" [disabled]="loading()">
           <mat-icon aria-hidden="true">save</mat-icon>
           Save app settings
@@ -143,64 +151,177 @@
           <span class="section-meta">{{ workspace.name }} workspace</span>
         }
       </div>
-      <form class="settings-grid" (ngSubmit)="saveProject()">
-        <label>
-          <span>Project name</span>
-          <input name="projectName" [(ngModel)]="projectForm.name" maxlength="160" required />
-        </label>
-        <app-report-multi-select
-          label="Status"
-          placeholder="Select status"
-          [options]="statusOptions"
-          [multiple]="false"
-          [selectedValues]="selectedValue(projectForm.status)"
-          (selectedValuesChange)="updateProjectStatus($event)"
-        />
-        <label>
-          <span>Hourly rate EUR</span>
-          <input
-            name="projectRate"
-            type="text"
-            inputmode="decimal"
-            [ngModel]="rateInput(projectForm.hourlyRate)"
-            (ngModelChange)="updateProjectRate($event)"
-            required
+      @if (canManageProjects()) {
+        <form #projectEditor class="settings-grid" (ngSubmit)="saveProject()">
+          <label>
+            <span>Project name</span>
+            <input name="projectName" [(ngModel)]="projectForm.name" maxlength="160" required />
+          </label>
+          <app-report-multi-select
+            label="Status"
+            placeholder="Select status"
+            [options]="statusOptions"
+            [multiple]="false"
+            [selectedValues]="selectedValue(projectForm.status)"
+            (selectedValuesChange)="updateProjectStatus($event)"
           />
-        </label>
-        <button type="submit" [disabled]="loading()">
-          <mat-icon aria-hidden="true">{{ projectForm.id ? 'check' : 'add' }}</mat-icon>
-          {{ projectForm.id ? 'Update project' : 'Add project' }}
-        </button>
-      </form>
+          <label>
+            <span>Hourly rate EUR</span>
+            <input
+              name="projectRate"
+              type="text"
+              inputmode="decimal"
+              [ngModel]="rateInput(projectForm.hourlyRate)"
+              (ngModelChange)="updateProjectRate($event)"
+              required
+            />
+          </label>
+          <div class="billing-editor span-all">
+            <div class="billing-editor-title">
+              <strong>Billing</strong>
+              <span>Used by reports and invoices. Dashboard amounts stay based on tracked time.</span>
+            </div>
+            <div class="billing-grid">
+              <app-report-multi-select
+                label="Billing rule"
+                placeholder="Select billing rule"
+                [options]="billingRuleOptions"
+                [multiple]="false"
+                [selectedValues]="selectedValue(projectForm.billingRuleType)"
+                (selectedValuesChange)="updateBillingRuleType($event)"
+              />
+              <label>
+                <span>Effective month</span>
+                <input name="billingEffectiveMonth" type="month" [(ngModel)]="projectForm.billingEffectiveMonth" required />
+              </label>
+              @if (projectForm.billingRuleType === 'FIXED_MONTHLY') {
+                <label>
+                  <span>Monthly amount EUR</span>
+                  <input
+                    name="projectMonthlyAmount"
+                    type="text"
+                    inputmode="decimal"
+                    [ngModel]="rateInput(projectForm.monthlyAmount)"
+                    (ngModelChange)="updateProjectMonthlyAmount($event)"
+                    required
+                  />
+                </label>
+              }
+              @if (projectForm.billingRuleType === 'MONTHLY_BASE_PLUS_OVERAGE') {
+                <label>
+                  <span>Monthly base EUR</span>
+                  <input
+                    name="projectBaseAmount"
+                    type="text"
+                    inputmode="decimal"
+                    [ngModel]="rateInput(projectForm.baseAmount)"
+                    (ngModelChange)="updateProjectBaseAmount($event)"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Included hours</span>
+                  <input
+                    name="projectIncludedHours"
+                    type="text"
+                    inputmode="decimal"
+                    [ngModel]="rateInput(projectForm.includedHours)"
+                    (ngModelChange)="updateProjectIncludedHours($event)"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Overage rate EUR/h</span>
+                  <input
+                    name="projectOverageRate"
+                    type="text"
+                    inputmode="decimal"
+                    [ngModel]="rateInput(projectForm.overageHourlyRate)"
+                    (ngModelChange)="updateProjectOverageRate($event)"
+                    required
+                  />
+                </label>
+              }
+            </div>
+          </div>
+          <button type="submit" [disabled]="loading()">
+            <mat-icon aria-hidden="true">{{ projectForm.id ? 'check' : 'add' }}</mat-icon>
+            {{ projectForm.id ? 'Update project' : 'Add project' }}
+          </button>
+        </form>
+      } @else {
+        <p class="empty">Project billing settings are read-only for organization members. Report a billing issue from a project below.</p>
+      }
 
       <div class="project-list">
         @for (project of projects(); track project.id) {
-          <article class="project-row">
-            <div>
+          <article class="project-row" [class.editing]="projectForm.id === project.id && canManageProjects()">
+            <div class="project-details">
               <strong>{{ project.name }}</strong>
               <span>{{ project.status.toLowerCase() }} · {{ rateLabel(project.hourlyRate) }} EUR/h</span>
+              <span>{{ billingSummary(project) }}</span>
+              <span>{{ taskSummary(project) }}</span>
+              @if (project.tasks.length) {
+                <div class="task-pills" aria-label="Project tasks">
+                  @for (task of project.tasks; track task.id) {
+                    <span>{{ task.name }} · {{ task.status.toLowerCase() }}</span>
+                  }
+                </div>
+              }
             </div>
             <div class="row-actions">
-              <button type="button" (click)="editProject(project)">
-                <mat-icon aria-hidden="true">edit</mat-icon>
-                Edit
-              </button>
-              <button type="button" class="danger" (click)="deleteProject(project)">
-                <mat-icon aria-hidden="true">delete</mat-icon>
-                Delete
-              </button>
-              <button type="button" class="secondary" (click)="editTask(project)">
-                <mat-icon aria-hidden="true">add_task</mat-icon>
-                Add task
-              </button>
+              @if (canManageProjects()) {
+                <button type="button" (click)="editProject(project)">
+                  <mat-icon aria-hidden="true">edit</mat-icon>
+                  Edit
+                </button>
+                <button type="button" class="danger" (click)="deleteProject(project)">
+                  <mat-icon aria-hidden="true">delete</mat-icon>
+                  Delete
+                </button>
+                <button type="button" class="secondary" (click)="editTask(project)">
+                  <mat-icon aria-hidden="true">add_task</mat-icon>
+                  Add task
+                </button>
+              } @else if (canReportProjectBillingIssue()) {
+                <button type="button" class="secondary" (click)="toggleBillingIssue(project)">
+                  <mat-icon aria-hidden="true">flag</mat-icon>
+                  Report billing issue
+                </button>
+              }
             </div>
+            @if (billingIssueProjectId() === project.id) {
+              <form class="billing-issue-form" (ngSubmit)="submitBillingIssue(project)">
+                <label>
+                  <span>Message</span>
+                  <textarea
+                    [name]="'billingIssueMessage' + project.id"
+                    rows="3"
+                    maxlength="2000"
+                    [ngModel]="billingIssueMessage(project.id)"
+                    (ngModelChange)="updateBillingIssueMessage(project.id, $event)"
+                    placeholder="Describe what looks wrong with this billing setup"
+                    required
+                  ></textarea>
+                </label>
+                <div class="row-actions">
+                  <button type="submit" [disabled]="loading()">
+                    <mat-icon aria-hidden="true">send</mat-icon>
+                    Send issue
+                  </button>
+                  <button type="button" class="secondary" (click)="toggleBillingIssue(project)" [disabled]="loading()">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            }
           </article>
         } @empty {
           <p class="empty">No projects in this workspace yet.</p>
         }
       </div>
 
-      @if (taskForm; as form) {
+      @if (canManageProjects() && taskForm; as form) {
         <form class="settings-grid task-editor" (ngSubmit)="saveTask()">
           <label>
             <span>Task name</span>

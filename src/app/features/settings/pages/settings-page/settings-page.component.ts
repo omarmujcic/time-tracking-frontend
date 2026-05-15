@@ -1,7 +1,8 @@
-import { Component, computed, effect, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthStateFacade } from '../../../../shared/state/auth/auth-state.facade';
+import { NotificationStateFacade } from '../../../../shared/state/notifications/notification-state.facade';
 import { WorkspaceStateFacade } from '../../../../shared/state/workspace/workspace-state.facade';
 import { ConfirmationDialogService } from '../../../../shared/ui/confirm-dialog/confirm-dialog.service';
 import { NotificationToastService } from '../../../../shared/ui/notification-toast/notification-toast.service';
@@ -12,6 +13,7 @@ import { ReportMultiSelectComponent } from '../../../reports/components/report-m
 import { ReportMultiSelectOption } from '../../../reports/components/report-multi-select/report-multi-select.model';
 import { InvoiceParty, InvoiceSetup, InvoiceWorkspaceSettingsRequest } from '../../../invoice/models/invoice.model';
 import { InvoiceService } from '../../../invoice/services/invoice.service';
+import { NotificationService as AppNotificationService } from '../../../notifications/services/notification.service';
 import {
   AccountProfile,
   DecimalSeparator,
@@ -20,6 +22,7 @@ import {
   PasswordForm,
   Project,
   ProjectForm,
+  ProjectBillingRuleType,
   ProjectStatus,
   TaskForm,
   TaskStatus,
@@ -38,6 +41,7 @@ const defaultPreference: UserPreference = {
   language: 'en',
   themeMode: 'SYSTEM',
   groupedEntriesEnabled: true,
+  includeOrganizationEntriesInPersonalReports: true,
   dateFormat: 'YYYY-MM-DD',
   decimalSeparator: 'DOT',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -50,6 +54,8 @@ const defaultPreference: UserPreference = {
   styleUrl: './settings-page.component.scss'
 })
 export class SettingsPageComponent {
+  @ViewChild('projectEditor') private projectEditor?: ElementRef<HTMLFormElement>;
+
   protected readonly loading = signal(false);
   protected readonly search = signal('');
   protected readonly timeZones = [
@@ -90,6 +96,11 @@ export class SettingsPageComponent {
     { value: 'ACTIVE', label: 'Active' },
     { value: 'INACTIVE', label: 'Inactive' }
   ];
+  protected readonly billingRuleOptions: ReportMultiSelectOption[] = [
+    { value: 'HOURLY', label: 'Hourly' },
+    { value: 'FIXED_MONTHLY', label: 'Fixed monthly' },
+    { value: 'MONTHLY_BASE_PLUS_OVERAGE', label: 'Monthly base + overage' }
+  ];
   protected readonly timeZoneOptions: ReportMultiSelectOption[] = this.timeZones.map((timeZone) => ({
     value: timeZone,
     label: timeZone
@@ -106,6 +117,15 @@ export class SettingsPageComponent {
     const role = this.activeWorkspace()?.role?.toUpperCase();
     return role === 'OWNER' || role === 'ADMIN';
   });
+  protected readonly canManageProjects = computed(() => {
+    const workspace = this.activeWorkspace();
+    return !workspace || workspace.type === 'PERSONAL' || this.canManageOrganization();
+  });
+  protected readonly canReportProjectBillingIssue = computed(() =>
+    this.activeWorkspace()?.type === 'ORGANIZATION' && !this.canManageOrganization()
+  );
+  protected readonly billingIssueProjectId = signal<string | null>(null);
+  protected readonly billingIssueMessages = signal<Record<string, string>>({});
   protected readonly searchMatches = computed(() => this.matches(this.search()));
 
   protected profile: AccountProfile = {
@@ -138,6 +158,8 @@ export class SettingsPageComponent {
     private readonly projectService: ProjectService,
     private readonly workspaceService: WorkspaceService,
     private readonly invoiceService: InvoiceService,
+    private readonly appNotificationService: AppNotificationService,
+    private readonly notificationState: NotificationStateFacade,
     private readonly workspaceState: WorkspaceStateFacade,
     private readonly authState: AuthStateFacade,
     private readonly confirmationDialog: ConfirmationDialogService,
@@ -154,6 +176,8 @@ export class SettingsPageComponent {
       this.currentWorkspaceKey = workspaceKey;
       this.projectForm = this.emptyProjectForm();
       this.taskForm = null;
+      this.billingIssueProjectId.set(null);
+      this.billingIssueMessages.set({});
       this.organizationName = this.activeWorkspace()?.type === 'ORGANIZATION' ? this.activeWorkspace()?.name ?? '' : '';
       void this.loadOrganizationMembers();
       void this.loadInvoiceSetup();
@@ -208,24 +232,54 @@ export class SettingsPageComponent {
   }
 
   protected editProject(project: Project): void {
+    if (!this.canManageProjects()) {
+      return;
+    }
+    const billingRule = project.billingRule;
     this.projectForm = {
       id: project.id,
       name: project.name,
       status: project.status,
-      hourlyRate: Number(project.hourlyRate)
+      hourlyRate: Number(project.hourlyRate),
+      billingRuleType: billingRule?.type ?? 'HOURLY',
+      billingEffectiveMonth: this.monthValue(billingRule?.effectiveFrom) || this.currentMonth(),
+      monthlyAmount: billingRule?.monthlyAmount === null || billingRule?.monthlyAmount === undefined
+        ? null
+        : Number(billingRule.monthlyAmount),
+      baseAmount: billingRule?.baseAmount === null || billingRule?.baseAmount === undefined
+        ? null
+        : Number(billingRule.baseAmount),
+      includedHours: billingRule?.includedHours === null || billingRule?.includedHours === undefined
+        ? null
+        : Number(billingRule.includedHours),
+      overageHourlyRate: billingRule?.overageHourlyRate === null || billingRule?.overageHourlyRate === undefined
+        ? null
+        : Number(billingRule.overageHourlyRate)
     };
+    window.setTimeout(() => {
+      this.projectEditor?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      this.projectEditor?.nativeElement.querySelector<HTMLInputElement>('input[name="projectName"]')?.focus();
+    });
   }
 
   protected async saveProject(): Promise<void> {
+    if (!this.canManageProjects()) {
+      this.showSettingsError('Only workspace owners and admins can edit projects.');
+      return;
+    }
     if (!this.projectForm.name.trim() || !this.projectForm.hourlyRate) {
       this.showSettingsError('Project name and hourly rate are required.');
+      return;
+    }
+    if (!this.validBillingForm()) {
       return;
     }
     await this.run(async () => {
       const request = {
         name: this.projectForm.name,
         status: this.projectForm.status,
-        hourlyRate: this.projectForm.hourlyRate ?? 0
+        hourlyRate: this.projectForm.hourlyRate ?? 0,
+        billingRule: this.projectBillingRuleRequest()
       };
       if (this.projectForm.id) {
         await this.projectService.update(this.projectForm.id, request);
@@ -238,6 +292,10 @@ export class SettingsPageComponent {
   }
 
   protected async deleteProject(project: Project): Promise<void> {
+    if (!this.canManageProjects()) {
+      this.showSettingsError('Only workspace owners and admins can delete projects.');
+      return;
+    }
     const confirmed = await this.confirmationDialog.confirm({
       title: 'Delete project',
       message: `Delete project "${project.name}"? Used projects must be marked inactive instead.`,
@@ -255,6 +313,9 @@ export class SettingsPageComponent {
   }
 
   protected editTask(project: Project, taskId?: string): void {
+    if (!this.canManageProjects()) {
+      return;
+    }
     const task = taskId ? project.tasks.find((option) => option.id === taskId) : null;
     this.taskForm = {
       projectId: project.id,
@@ -265,6 +326,10 @@ export class SettingsPageComponent {
   }
 
   protected async saveTask(): Promise<void> {
+    if (!this.canManageProjects()) {
+      this.showSettingsError('Only workspace owners and admins can edit tasks.');
+      return;
+    }
     if (!this.taskForm || !this.taskForm.name.trim()) {
       this.showSettingsError('Task name is required.');
       return;
@@ -282,6 +347,10 @@ export class SettingsPageComponent {
   }
 
   protected async deleteTask(project: Project, taskId: string): Promise<void> {
+    if (!this.canManageProjects()) {
+      this.showSettingsError('Only workspace owners and admins can delete tasks.');
+      return;
+    }
     const task = project.tasks.find((option) => option.id === taskId);
     const confirmed = await this.confirmationDialog.confirm({
       title: 'Delete task',
@@ -439,6 +508,77 @@ export class SettingsPageComponent {
     this.projectForm.status = (values[0] ?? 'ACTIVE') as ProjectStatus;
   }
 
+  protected updateBillingRuleType(values: string[]): void {
+    this.projectForm.billingRuleType = (values[0] ?? 'HOURLY') as ProjectBillingRuleType;
+  }
+
+  protected updateProjectMonthlyAmount(value: string): void {
+    this.projectForm.monthlyAmount = parseUserDecimal(value, this.preferences.decimalSeparator);
+  }
+
+  protected updateProjectBaseAmount(value: string): void {
+    this.projectForm.baseAmount = parseUserDecimal(value, this.preferences.decimalSeparator);
+  }
+
+  protected updateProjectIncludedHours(value: string): void {
+    this.projectForm.includedHours = parseUserDecimal(value, this.preferences.decimalSeparator);
+  }
+
+  protected updateProjectOverageRate(value: string): void {
+    this.projectForm.overageHourlyRate = parseUserDecimal(value, this.preferences.decimalSeparator);
+  }
+
+  protected billingSummary(project: Project): string {
+    const rule = project.billingRule;
+    if (!rule || rule.type === 'HOURLY') {
+      return 'Hourly billing';
+    }
+    if (rule.type === 'FIXED_MONTHLY') {
+      return `${this.rateLabel(Number(rule.monthlyAmount ?? 0))} EUR/month fixed`;
+    }
+    return `${this.rateLabel(Number(rule.baseAmount ?? 0))} EUR base, ${this.rateLabel(Number(rule.includedHours ?? 0))}h included, ${this.rateLabel(Number(rule.overageHourlyRate ?? 0))} EUR/h overage`;
+  }
+
+  protected taskSummary(project: Project): string {
+    if (!project.tasks.length) {
+      return 'No tasks';
+    }
+    return `${project.tasks.length} task${project.tasks.length === 1 ? '' : 's'}`;
+  }
+
+  protected toggleBillingIssue(project: Project): void {
+    this.billingIssueProjectId.update((projectId) => projectId === project.id ? null : project.id);
+  }
+
+  protected billingIssueMessage(projectId: string): string {
+    return this.billingIssueMessages()[projectId] ?? '';
+  }
+
+  protected updateBillingIssueMessage(projectId: string, message: string): void {
+    this.billingIssueMessages.update((messages) => ({ ...messages, [projectId]: message }));
+  }
+
+  protected async submitBillingIssue(project: Project): Promise<void> {
+    if (!this.canReportProjectBillingIssue()) {
+      return;
+    }
+    const message = this.billingIssueMessage(project.id).trim();
+    if (!message) {
+      this.showSettingsError('Billing issue message is required.');
+      return;
+    }
+    await this.run(async () => {
+      await this.appNotificationService.createProjectBillingIssue({ projectId: project.id, message });
+      this.billingIssueMessages.update((messages) => {
+        const next = { ...messages };
+        delete next[project.id];
+        return next;
+      });
+      this.billingIssueProjectId.set(null);
+      await this.notificationState.loadOpenCount();
+    }, 'Billing issue sent.');
+  }
+
   protected updateTaskStatus(form: TaskForm, values: string[]): void {
     form.status = (values[0] ?? 'ACTIVE') as TaskStatus;
   }
@@ -481,7 +621,57 @@ export class SettingsPageComponent {
   }
 
   private emptyProjectForm(): ProjectForm {
-    return { id: null, name: '', status: 'ACTIVE', hourlyRate: null };
+    return {
+      id: null,
+      name: '',
+      status: 'ACTIVE',
+      hourlyRate: null,
+      billingRuleType: 'HOURLY',
+      billingEffectiveMonth: this.currentMonth(),
+      monthlyAmount: null,
+      baseAmount: null,
+      includedHours: null,
+      overageHourlyRate: null
+    };
+  }
+
+  private validBillingForm(): boolean {
+    if (!this.projectForm.billingEffectiveMonth) {
+      this.showSettingsError('Billing effective month is required.');
+      return false;
+    }
+    if (this.projectForm.billingRuleType === 'FIXED_MONTHLY' && this.projectForm.monthlyAmount === null) {
+      this.showSettingsError('Monthly amount is required for fixed monthly billing.');
+      return false;
+    }
+    if (this.projectForm.billingRuleType === 'MONTHLY_BASE_PLUS_OVERAGE') {
+      if (this.projectForm.baseAmount === null || this.projectForm.includedHours === null || this.projectForm.overageHourlyRate === null) {
+        this.showSettingsError('Base amount, included hours, and overage rate are required.');
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private projectBillingRuleRequest() {
+    const type = this.projectForm.billingRuleType;
+    return {
+      type,
+      effectiveFrom: `${this.projectForm.billingEffectiveMonth}-01`,
+      monthlyAmount: type === 'FIXED_MONTHLY' ? this.projectForm.monthlyAmount ?? 0 : null,
+      baseAmount: type === 'MONTHLY_BASE_PLUS_OVERAGE' ? this.projectForm.baseAmount ?? 0 : null,
+      includedHours: type === 'MONTHLY_BASE_PLUS_OVERAGE' ? this.projectForm.includedHours ?? 0 : null,
+      overageHourlyRate: type === 'MONTHLY_BASE_PLUS_OVERAGE' ? this.projectForm.overageHourlyRate ?? 0 : null
+    };
+  }
+
+  private monthValue(value: string | null | undefined): string {
+    return value ? value.slice(0, 7) : '';
+  }
+
+  private currentMonth(): string {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }
 
   private invoiceWorkspaceFormFromSetup(setup: InvoiceSetup): InvoiceWorkspaceSettingsRequest {
@@ -584,7 +774,7 @@ export class SettingsPageComponent {
     return {
       account: 'name username email phone password login profile',
       app: 'language theme dark light group date format decimal separator timezone',
-      projects: 'project task hourly rate active inactive',
+      projects: 'project task hourly rate active inactive billing retainer monthly overage',
       organization: 'organization workspace code join create regenerate owner admin member',
       invoice: 'invoice recipient billing to tax terms due defaults'
     }[tab];

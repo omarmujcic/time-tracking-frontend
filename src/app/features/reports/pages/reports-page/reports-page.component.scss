@@ -227,12 +227,19 @@ button.tab-button.active {
   margin-bottom: 16px;
 }
 
-.chart-frame {
-  height: 360px;
+.time-chart-panel {
+  display: grid;
+  grid-template-rows: auto minmax(360px, 1fr);
+  gap: 16px;
 }
 
-.task-chart-mode .chart-frame {
-  height: 570px;
+.chart-frame {
+  min-height: 360px;
+  height: 100%;
+}
+
+.task-chart-mode .time-chart-panel {
+  grid-template-rows: auto minmax(570px, 1fr);
 }
 
 .donut-frame {
@@ -356,12 +363,18 @@ button.tab-button.active {
 
 .entry-head,
 .entry-row {
-  min-width: 880px;
+  min-width: 1050px;
   display: grid;
-  grid-template-columns: 1fr 1.4fr 120px 220px 120px;
+  grid-template-columns: 1fr 1fr 110px 2fr 110px;
   gap: 12px;
   align-items: center;
   padding: 11px 12px;
+}
+
+.flat-entry-table .entry-head,
+.flat-entry-table .entry-row {
+  min-width: 1160px;
+  grid-template-columns: 1fr 1fr 1fr 110px 2fr 110px;
 }
 
 .entry-head {
@@ -395,14 +408,9 @@ button.tab-button.active {
   color: colors.$color-muted;
 }
 
-.entry-row .time-cell {
-  display: grid;
-  gap: 3px;
-}
-
-.entry-row .time-cell strong {
-  color: colors.$color-text;
-  font-size: 1rem;
+.entry-head span:last-child,
+.entry-row > span:last-child {
+  justify-self: end;
 }
 
 .print-meta {
@@ -438,8 +446,7 @@ button.tab-button.active {
   h3,
   .project-row strong,
   .project-entry-summary strong,
-  .entry-row,
-  .entry-row .time-cell strong {
+  .entry-row {
     color: #e3dfd7;
   }
 

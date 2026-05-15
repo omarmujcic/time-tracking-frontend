@@ -13,8 +13,12 @@ export class ReportService {
     return firstValueFrom(this.http.get<TimeReport>(`${this.baseUrl}/time`, { params: this.params(filters) }));
   }
 
-  filterOptions(): Promise<ReportFilterOptions> {
-    return firstValueFrom(this.http.get<ReportFilterOptions>(`${this.baseUrl}/filter-options`));
+  filterOptions(includeOrganizationEntries = false): Promise<ReportFilterOptions> {
+    let params = new HttpParams();
+    if (includeOrganizationEntries) {
+      params = params.set('includeOrganizationEntries', 'true');
+    }
+    return firstValueFrom(this.http.get<ReportFilterOptions>(`${this.baseUrl}/filter-options`, { params }));
   }
 
   private params(filters: ReportFilters): HttpParams {
@@ -35,6 +39,9 @@ export class ReportService {
     });
     if (filters.includeNoTask) {
       params = params.set('includeNoTask', 'true');
+    }
+    if (filters.includeOrganizationEntries) {
+      params = params.set('includeOrganizationEntries', 'true');
     }
     if (filters.minRate !== null) {
       params = params.set('minRate', String(filters.minRate));

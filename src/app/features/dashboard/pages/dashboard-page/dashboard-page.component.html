@@ -130,26 +130,28 @@
             required
           />
         </label>
-        <label>
-          <span>{{ translationPath + 'entry.start' | translate }}</span>
+        <div class="field">
+          <span>{{ translationPath + 'entry.date' | translate }}</span>
           <app-date-picker
-            mode="datetime"
+            mode="date"
             [dateFormat]="preferences().dateFormat"
-            [placeholder]="translationPath + 'date.selectStart' | translate"
-            [value]="manualForm.startedAt"
-            (valueChange)="manualForm.startedAt = $event"
+            [placeholder]="translationPath + 'date.selectDay' | translate"
+            [value]="manualForm.date"
+            (valueChange)="updateManualDate($event)"
           />
-        </label>
-        <label>
-          <span>{{ translationPath + 'entry.end' | translate }}</span>
-          <app-date-picker
-            mode="datetime"
-            [dateFormat]="preferences().dateFormat"
-            [placeholder]="translationPath + 'date.selectEnd' | translate"
-            [value]="manualForm.endedAt"
-            (valueChange)="manualForm.endedAt = $event"
-          />
-        </label>
+        </div>
+        <app-time-picker
+          [label]="translationPath + 'entry.start' | translate"
+          [placeholder]="translationPath + 'entry.selectStartTime' | translate"
+          [value]="manualForm.startTime"
+          (valueChange)="updateManualStartTime($event)"
+        />
+        <app-time-picker
+          [label]="translationPath + 'entry.end' | translate"
+          [placeholder]="translationPath + 'entry.selectEndTime' | translate"
+          [value]="manualForm.endTime"
+          (valueChange)="updateManualEndTime($event)"
+        />
       </div>
       <button type="submit" [disabled]="loading()">
         <mat-icon aria-hidden="true">add</mat-icon>
@@ -164,7 +166,7 @@
       <h2>{{ translationPath + 'filters.title' | translate }}</h2>
     </div>
     <div class="filters-grid">
-      <label>
+      <div class="field">
         <span>{{ translationPath + 'filters.month' | translate }}</span>
         <app-date-picker
           mode="month"
@@ -173,8 +175,8 @@
           [value]="filters.month"
           (valueChange)="filters.month = $event"
         />
-      </label>
-      <label>
+      </div>
+      <div class="field">
         <span>{{ translationPath + 'filters.day' | translate }}</span>
         <app-date-picker
           mode="date"
@@ -183,7 +185,7 @@
           [value]="filters.day"
           (valueChange)="filters.day = $event"
         />
-      </label>
+      </div>
       <app-report-multi-select
         [label]="translationPath + 'entry.project' | translate"
         placeholder="All projects"
@@ -211,6 +213,18 @@
     <div class="panel-title">
       <mat-icon aria-hidden="true">list_alt</mat-icon>
       <h2>{{ translationPath + 'entries.title' | translate }}</h2>
+      @if (groupedEntriesEnabled() && dayEntryGroups().length) {
+        <div class="row-actions" style="margin-left: auto">
+          <button type="button" class="secondary" (click)="expandAllEntryGroups()" [disabled]="loading()">
+            <mat-icon aria-hidden="true">unfold_more</mat-icon>
+            {{ translationPath + 'entries.expandAll' | translate }}
+          </button>
+          <button type="button" class="secondary" (click)="minimizeAllEntryGroups()" [disabled]="loading()">
+            <mat-icon aria-hidden="true">unfold_less</mat-icon>
+            {{ translationPath + 'entries.minimizeAll' | translate }}
+          </button>
+        </div>
+      }
     </div>
 
     <div class="entries-list">
@@ -265,6 +279,25 @@
         }
       }
     </div>
+
+    @if (shownEntryCount() || hasPreviousPage() || hasNextPage()) {
+      <div class="pagination-bar">
+        <span>
+          {{ translationPath + 'entries.page' | translate }} {{ pageNumber() }} ·
+          {{ shownEntryCount() }} {{ translationPath + 'entries.shown' | translate }}
+        </span>
+        <div class="row-actions pagination-actions">
+          <button type="button" class="secondary" (click)="previousPage()" [disabled]="loading() || !hasPreviousPage()">
+            <mat-icon aria-hidden="true">chevron_left</mat-icon>
+            {{ translationPath + 'entries.previous' | translate }}
+          </button>
+          <button type="button" class="secondary" (click)="nextPage()" [disabled]="loading() || !hasNextPage()">
+            {{ translationPath + 'entries.next' | translate }}
+            <mat-icon aria-hidden="true">chevron_right</mat-icon>
+          </button>
+        </div>
+      </div>
+    }
   </section>
 </section>
 
@@ -301,29 +334,31 @@
             name="editRate{{ entry.id }}"
           />
         </label>
-        <label>
-          <span>{{ translationPath + 'entry.start' | translate }}</span>
+        <div class="field">
+          <span>{{ translationPath + 'entry.date' | translate }}</span>
           <app-date-picker
-            mode="datetime"
+            mode="date"
             [dateFormat]="preferences().dateFormat"
-            [placeholder]="translationPath + 'date.selectStart' | translate"
-            [value]="editForm.startedAt"
-            (valueChange)="editForm.startedAt = $event"
+            [placeholder]="translationPath + 'date.selectDay' | translate"
+            [value]="editForm.date"
+            (valueChange)="editForm.date = $event"
           />
-        </label>
-        <label>
-          <span>{{ translationPath + 'entry.end' | translate }}</span>
-          <app-date-picker
-            mode="datetime"
-            [dateFormat]="preferences().dateFormat"
-            [placeholder]="translationPath + 'entry.running' | translate"
-            [value]="editForm.endedAt"
-            [disabled]="entry.active"
-            (valueChange)="editForm.endedAt = $event"
-          />
-        </label>
+        </div>
+        <app-time-picker
+          [label]="translationPath + 'entry.start' | translate"
+          [placeholder]="translationPath + 'entry.selectStartTime' | translate"
+          [value]="editForm.startTime"
+          (valueChange)="editForm.startTime = $event"
+        />
+        <app-time-picker
+          [label]="translationPath + 'entry.end' | translate"
+          [placeholder]="translationPath + 'entry.running' | translate"
+          [value]="editForm.endTime"
+          [disabled]="entry.active"
+          (valueChange)="editForm.endTime = $event"
+        />
       </div>
-      <div class="row-actions">
+      <div class="row-actions edit-grid">
         <button
           type="button"
           class="icon-button"

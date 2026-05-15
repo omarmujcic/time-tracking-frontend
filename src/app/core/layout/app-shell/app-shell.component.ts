@@ -13,6 +13,7 @@ import { httpErrorMessage } from '../../../shared/utils/http-error-message';
 import { PreferenceService } from '../../../features/settings/services/preference.service';
 import { TimeEntry } from '../../../features/dashboard/models/time-entry.model';
 import { NavItem } from '../models/nav-item.model';
+import { NotificationStateFacade } from '../../../shared/state/notifications/notification-state.facade';
 
 @Component({
   selector: 'app-shell',
@@ -28,6 +29,7 @@ export class AppShellComponent implements OnDestroy {
   protected readonly activeTimerEntry: Signal<TimeEntry | null>;
   protected readonly activeTimerDuration: Signal<string>;
   protected readonly activeTimerContext: Signal<string>;
+  protected readonly notificationOpenCount: Signal<number>;
   protected readonly currentUrl = signal('');
   protected readonly stoppingSidebarTimer = signal(false);
   protected readonly showSidebarTimer = computed(() => {
@@ -45,7 +47,7 @@ export class AppShellComponent implements OnDestroy {
   protected readonly navItems: NavItem[] = [
     { labelKey: 'app.nav.dashboard', icon: 'dashboard', path: '/dashboard' },
     { labelKey: 'app.nav.reports', icon: 'monitoring', path: '/reports' },
-    { labelKey: 'app.nav.import', icon: 'upload_file', path: '/import' },
+    { labelKey: 'app.nav.notifications', icon: 'notifications', path: '/notifications' },
     { labelKey: 'app.nav.invoice', icon: 'receipt_long', path: '/invoice' },
     { labelKey: 'app.nav.calendar', icon: 'calendar_month', path: '/calendar' },
     { labelKey: 'app.nav.settings', icon: 'settings', path: '/settings' },
@@ -57,6 +59,7 @@ export class AppShellComponent implements OnDestroy {
     private readonly workspaceState: WorkspaceStateFacade,
     private readonly preferenceService: PreferenceService,
     private readonly activeTimer: ActiveTimerFacade,
+    private readonly notificationState: NotificationStateFacade,
     private readonly notifications: NotificationToastService,
     private readonly router: Router
   ) {
@@ -65,8 +68,10 @@ export class AppShellComponent implements OnDestroy {
     this.activeTimerEntry = this.activeTimer.activeEntry;
     this.activeTimerDuration = this.activeTimer.durationLabel;
     this.activeTimerContext = this.activeTimer.contextLabel;
+    this.notificationOpenCount = this.notificationState.openCount;
     this.workspaceState.load();
     this.applyPreferences();
+    void this.notificationState.loadOpenCount();
     this.currentUrl.set(this.router.url);
     this.routeSubscription = this.router.events.subscribe((event) => {
       if (event instanceof NavigationEnd) {
@@ -77,6 +82,7 @@ export class AppShellComponent implements OnDestroy {
     effect(() => {
       if (this.workspaceState.activeWorkspaceKey()) {
         void this.activeTimer.loadActive();
+        void this.notificationState.loadOpenCount();
       }
     });
   }

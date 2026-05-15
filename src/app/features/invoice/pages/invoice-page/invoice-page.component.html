@@ -360,7 +360,7 @@
               <span>Tax</span>
               <span>Total</span>
             </div>
-            @for (line of document.lines; track line.projectKey) {
+            @for (line of document.lines; track $index) {
               <div class="invoice-row">
                 <div>
                   <strong>{{ line.projectName }}</strong>

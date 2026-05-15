@@ -25,9 +25,13 @@ export const routes: Routes = [
           import('./features/reports/pages/reports-page/reports-page.component').then((m) => m.ReportsPageComponent)
       },
       {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./features/notifications/pages/notifications-page/notifications-page.component').then((m) => m.NotificationsPageComponent)
+      },
+      {
         path: 'import',
-        component: PlaceholderPageComponent,
-        data: { titleKey: 'app.nav.import', icon: 'upload_file' }
+        redirectTo: 'notifications'
       },
       {
         path: 'invoice',

@@ -1,0 +1,41 @@
+<div class="time-field">
+  <span>{{ label }}</span>
+  <button
+    type="button"
+    class="time-trigger"
+    [class.placeholder]="!valueState()"
+    [disabled]="disabled"
+    (click)="toggle($event)"
+  >
+    <strong>{{ displayValue() }}</strong>
+    <mat-icon aria-hidden="true">schedule</mat-icon>
+  </button>
+</div>
+
+@if (open()) {
+  <div class="time-popover" (click)="keepOpen($event)">
+    <div class="time-inputs">
+      <label>
+        <span>HH</span>
+        <input type="number" min="0" max="23" [value]="timePart('hours')" (input)="updatePart('hours', $event)" />
+      </label>
+      <label>
+        <span>MM</span>
+        <input type="number" min="0" max="59" [value]="timePart('minutes')" (input)="updatePart('minutes', $event)" />
+      </label>
+    </div>
+
+    <div class="minute-steps">
+      <button type="button" (click)="adjustMinutes(-15)">-15m</button>
+      <button type="button" (click)="adjustMinutes(15)">+15m</button>
+    </div>
+
+    <div class="preset-grid">
+      @for (preset of presets; track preset.value) {
+        <button type="button" [class.selected]="isPresetSelected(preset)" (click)="selectPreset(preset)">
+          {{ preset.label }}
+        </button>
+      }
+    </div>
+  </div>
+}
